@@ -1,4 +1,4 @@
-# Load Vehicle Connect
+# TripJio
 
 A feature-first, scalable Flutter architecture for vehicle tracking and load management.
 
