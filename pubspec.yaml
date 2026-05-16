@@ -1,5 +1,5 @@
-name: load_vehicle_connect
-description: A new Flutter project for Load Vehicle Connect.
+name: tripjio
+description: A new Flutter project for TripJio.
 publish_to: 'none'
 
 version: 1.0.0+1
