@@ -1,0 +1,44 @@
+name: load_vehicle_connect
+description: A new Flutter project for Load Vehicle Connect.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  go_router: ^12.0.0
+  dio: ^5.3.3
+  firebase_core: ^2.24.2
+  firebase_auth: ^4.15.3
+  cloud_firestore: ^4.13.6
+  firebase_storage: ^11.5.6
+  firebase_messaging: ^14.7.9
+  google_maps_flutter: ^2.5.3
+  geolocator: ^10.1.0
+  shared_preferences: ^2.2.2
+  logger: ^2.0.2+1
+  intl: ^0.18.1
+  flutter_riverpod: ^2.4.9 # Standard for controllers/state management
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/animations/
+  # fonts:
+  #   - family: Inter
+  #     fonts:
+  #       - asset: assets/fonts/Inter-Regular.ttf
+  #       - asset: assets/fonts/Inter-Bold.ttf
+  #         weight: 700
