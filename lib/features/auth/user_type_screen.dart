@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'phone_entry_screen.dart';
 
 enum UserType { load, truck }
@@ -31,7 +31,7 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF6B35),
+                      color: const Color(0xFF003F7D),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Center(
@@ -100,7 +100,7 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                             ),
                           ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B35),
+                    backgroundColor: const Color(0xFF003F7D),
                     disabledBackgroundColor: Colors.grey.shade300,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
@@ -147,9 +147,9 @@ class _UserTypeCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFFFF0EA) : Colors.white,
+          color: selected ? const Color(0xFFE6EEF8) : Colors.white,
           border: Border.all(
-            color: selected ? const Color(0xFFFF6B35) : Colors.grey.shade300,
+            color: selected ? const Color(0xFF003F7D) : Colors.grey.shade300,
             width: selected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(12),

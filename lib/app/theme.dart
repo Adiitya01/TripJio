@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color primaryColor = Color(0xFFFF6D38); // TripJio Orange
+  static const Color primaryColor = Color(0xFF003F7D); // Sapphire Navy
   static const Color secondaryColor = Colors.white;
 
   static ThemeData get lightTheme {

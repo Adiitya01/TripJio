@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import '../driver/home/driver_home_screen.dart';
+import '../load_owner/home/load_owner_home_screen.dart';
 
 class LocationPermissionScreen extends StatelessWidget {
-  const LocationPermissionScreen({super.key});
+  final bool isDriver;
+
+  const LocationPermissionScreen({super.key, required this.isDriver});
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +22,7 @@ class LocationPermissionScreen extends StatelessWidget {
                 width: 200,
                 height: 200,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFFFE8DF),
+                  color: Color(0xFFE6EEF8),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -26,7 +30,7 @@ class LocationPermissionScreen extends StatelessWidget {
                     width: 120,
                     height: 120,
                     decoration: const BoxDecoration(
-                      color: Color(0xFFFF6B35),
+                      color: Color(0xFF003F7D),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -69,10 +73,17 @@ class LocationPermissionScreen extends StatelessWidget {
                 height: 56,
                 child: ElevatedButton(
                   onPressed: () {
-                    // TODO: request location permission → navigate to Home
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) => isDriver
+                            ? const DriverHomeScreen()
+                            : const LoadOwnerHomeScreen(),
+                      ),
+                      (_) => false,
+                    );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B35),
+                    backgroundColor: const Color(0xFF003F7D),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(28)),

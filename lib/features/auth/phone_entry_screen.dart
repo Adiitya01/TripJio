@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'user_type_screen.dart';
 import 'otp_screen.dart';
@@ -63,7 +63,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                         horizontal: 12, vertical: 15),
                     decoration: BoxDecoration(
                       border:
-                          Border.all(color: const Color(0xFFFF6B35)),
+                          Border.all(color: const Color(0xFF003F7D)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Row(
@@ -96,12 +96,12 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(
-                              color: Color(0xFFFF6B35)),
+                              color: Color(0xFF003F7D)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(
-                              color: Color(0xFFFF6B35), width: 2),
+                              color: Color(0xFF003F7D), width: 2),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 15),
@@ -117,7 +117,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                     value: _agreed,
                     onChanged: (v) =>
                         setState(() => _agreed = v ?? false),
-                    activeColor: const Color(0xFFFF6B35),
+                    activeColor: const Color(0xFF003F7D),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(4)),
                   ),
@@ -131,7 +131,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                           TextSpan(
                             text: 'Terms',
                             style: TextStyle(
-                              color: Color(0xFFFF6B35),
+                              color: Color(0xFF003F7D),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -139,7 +139,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                           TextSpan(
                             text: 'Privacy Policy',
                             style: TextStyle(
-                              color: Color(0xFFFF6B35),
+                              color: Color(0xFF003F7D),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -165,7 +165,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                           )
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B35),
+                    backgroundColor: const Color(0xFF003F7D),
                     disabledBackgroundColor: Colors.grey.shade300,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(

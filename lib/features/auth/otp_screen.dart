@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'user_type_screen.dart';
@@ -135,14 +135,14 @@ class _OtpScreenState extends State<OtpScreen> {
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(
                             color: _controllers[i].text.isNotEmpty
-                                ? const Color(0xFFFF6B35)
+                                ? const Color(0xFF003F7D)
                                 : Colors.grey.shade300,
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(
-                              color: Color(0xFFFF6B35), width: 2),
+                              color: Color(0xFF003F7D), width: 2),
                         ),
                       ),
                     ),
@@ -161,7 +161,7 @@ class _OtpScreenState extends State<OtpScreen> {
                             TextSpan(
                               text: '$mm:$ss',
                               style: const TextStyle(
-                                color: Color(0xFFFF6B35),
+                                color: Color(0xFF003F7D),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -173,7 +173,7 @@ class _OtpScreenState extends State<OtpScreen> {
                         child: const Text(
                           'Resend OTP',
                           style: TextStyle(
-                            color: Color(0xFFFF6B35),
+                            color: Color(0xFF003F7D),
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
                           ),
@@ -195,7 +195,7 @@ class _OtpScreenState extends State<OtpScreen> {
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B35),
+                    backgroundColor: const Color(0xFF003F7D),
                     disabledBackgroundColor: Colors.grey.shade300,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(

@@ -66,10 +66,10 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                         width: double.infinity,
                         height: 110,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFF0EA),
+                          color: const Color(0xFFE6EEF8),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: const Color(0xFFFF6B35),
+                            color: const Color(0xFF003F7D),
                             width: 1.5,
                             style: BorderStyle.solid,
                           ),
@@ -80,13 +80,13 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                             Icon(
                               Icons.camera_alt_outlined,
                               size: 36,
-                              color: Color(0xFFFF6B35),
+                              color: Color(0xFF003F7D),
                             ),
                             SizedBox(height: 8),
                             Text(
                               'Add Vehicle Photo',
                               style: TextStyle(
-                                color: Color(0xFFFF6B35),
+                                color: Color(0xFF003F7D),
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -119,7 +119,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(
-                              color: Color(0xFFFF6B35)),
+                              color: Color(0xFF003F7D)),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 14),
@@ -144,11 +144,11 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                             duration: const Duration(milliseconds: 200),
                             decoration: BoxDecoration(
                               color: selected
-                                  ? const Color(0xFFFFF0EA)
+                                  ? const Color(0xFFE6EEF8)
                                   : Colors.white,
                               border: Border.all(
                                 color: selected
-                                    ? const Color(0xFFFF6B35)
+                                    ? const Color(0xFF003F7D)
                                     : Colors.grey.shade300,
                                 width: selected ? 2 : 1,
                               ),
@@ -163,7 +163,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                                       ? FontWeight.w600
                                       : FontWeight.normal,
                                   color: selected
-                                      ? const Color(0xFFFF6B35)
+                                      ? const Color(0xFF003F7D)
                                       : Colors.black87,
                                 ),
                               ),
@@ -186,11 +186,11 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                   onPressed: _canComplete
                       ? () => Navigator.of(context).push(MaterialPageRoute(
                             builder: (_) =>
-                                const LocationPermissionScreen(),
+                                const LocationPermissionScreen(isDriver: true),
                           ))
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B35),
+                    backgroundColor: const Color(0xFF003F7D),
                     disabledBackgroundColor: Colors.grey.shade300,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(

@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
       title: 'TripJio',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        scaffoldBackgroundColor: const Color(0xFFFF6B35), // TripJio orange
+        scaffoldBackgroundColor: const Color(0xFF003F7D), // Sapphire Navy
       ),
       home: const SplashScreen(),
     );

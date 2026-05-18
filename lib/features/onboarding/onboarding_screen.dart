@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../auth/user_type_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -30,8 +30,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   static const _slides = [
     _SlideData(
-      bgColor: Color(0xFFFFF0EA),
-      circleColor: Color(0xFFFF6B35),
+      bgColor: Color(0xFFE6EEF8),
+      circleColor: Color(0xFF003F7D),
       icon: Icons.location_on,
       title: 'Find Trucks\nNear You',
       subtitle: 'Live GPS map shows all available trucks within your area.',
@@ -168,7 +168,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         height: 8,
                         decoration: BoxDecoration(
                           color: i == _currentPage
-                              ? const Color(0xFFFF6B35)
+                              ? const Color(0xFF003F7D)
                               : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(4),
                         ),
@@ -182,7 +182,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: ElevatedButton(
                       onPressed: _next,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF6B35),
+                        backgroundColor: const Color(0xFF003F7D),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(28),

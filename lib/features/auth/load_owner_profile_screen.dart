@@ -72,7 +72,7 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: const Color(0xFFFF6B35),
+                                color: const Color(0xFF003F7D),
                                 width: 2,
                               ),
                             ),
@@ -89,7 +89,7 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
                               width: 28,
                               height: 28,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFF6B35),
+                                color: const Color(0xFF003F7D),
                                 shape: BoxShape.circle,
                                 border: Border.all(
                                     color: Colors.white, width: 2),
@@ -140,7 +140,7 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(
-                              color: Color(0xFFFF6B35)),
+                              color: Color(0xFF003F7D)),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 14),
@@ -165,11 +165,11 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
                   onPressed: _canContinue
                       ? () => Navigator.of(context).push(MaterialPageRoute(
                             builder: (_) =>
-                                const LocationPermissionScreen(),
+                                const LocationPermissionScreen(isDriver: false),
                           ))
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B35),
+                    backgroundColor: const Color(0xFF003F7D),
                     disabledBackgroundColor: Colors.grey.shade300,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
@@ -211,7 +211,7 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFFF6B35)),
+          borderSide: const BorderSide(color: Color(0xFF003F7D)),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
