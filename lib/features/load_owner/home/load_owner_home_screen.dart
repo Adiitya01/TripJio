@@ -1,23 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/load_owner_provider.dart';
 import 'drivers_list_screen.dart';
 import 'send_request_screen.dart';
 
 const _navy = Color(0xFF003F7D);
 const _navyLight = Color(0xFFE6EEF8);
 
-class LoadOwnerHomeScreen extends StatefulWidget {
+class LoadOwnerHomeScreen extends ConsumerStatefulWidget {
   const LoadOwnerHomeScreen({super.key});
 
   @override
-  State<LoadOwnerHomeScreen> createState() => _LoadOwnerHomeScreenState();
+  ConsumerState<LoadOwnerHomeScreen> createState() =>
+      _LoadOwnerHomeScreenState();
 }
 
-class _LoadOwnerHomeScreenState extends State<LoadOwnerHomeScreen> {
-  int _selectedType = 0; // 0=All, 1=Mini, 2=LCV, 3=HCV
-  int? _selectedPin;
-
-  static const _types = ['All Types', 'Mini', 'LCV', 'HCV'];
-
+class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
   static const _trucks = [
     _TruckPin(name: 'Suresh Patil', vehicle: 'Mini Truck', number: 'MH 14 AB 1234', capacity: '800 kg', distance: '2.4 km', rating: 4.8, trips: 234, dx: 0.62, dy: 0.30),
     _TruckPin(name: 'Ramesh Kumar', vehicle: 'LCV', number: 'MH 12 CD 5678', capacity: '1200 kg', distance: '3.7 km', rating: 4.6, trips: 187, dx: 0.25, dy: 0.52),
@@ -26,6 +24,8 @@ class _LoadOwnerHomeScreenState extends State<LoadOwnerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedType = ref.watch(vehicleTypeFilterProvider);
+    final selectedPin = ref.watch(selectedTruckPinProvider);
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
@@ -73,8 +73,9 @@ class _LoadOwnerHomeScreenState extends State<LoadOwnerHomeScreen> {
                     children: [
                       _TypeChip(
                         label: 'All Types',
-                        selected: _selectedType == 0,
-                        onTap: () => setState(() => _selectedType = 0),
+                        selected: selectedType == 0,
+                        onTap: () =>
+                            ref.read(vehicleTypeFilterProvider.notifier).state = 0,
                       ),
                       const SizedBox(width: 8),
                       _TypeChip(
@@ -112,11 +113,11 @@ class _LoadOwnerHomeScreenState extends State<LoadOwnerHomeScreen> {
                             top: constraints.maxHeight * _trucks[i].dy - 22,
                             child: GestureDetector(
                               onTap: () {
-                                setState(() => _selectedPin = i);
+                                ref.read(selectedTruckPinProvider.notifier).state = i;
                                 _showDriverSheet(context, _trucks[i]);
                               },
                               child: _TruckMarker(
-                                selected: _selectedPin == i,
+                                selected: selectedPin == i,
                               ),
                             ),
                           ),
@@ -199,13 +200,13 @@ class _LoadOwnerHomeScreenState extends State<LoadOwnerHomeScreen> {
   }
 
   void _showDriverSheet(BuildContext context, _TruckPin truck) {
-    setState(() => _selectedPin = _trucks.indexOf(truck));
+    ref.read(selectedTruckPinProvider.notifier).state = _trucks.indexOf(truck);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _DriverDetailsSheet(truck: truck),
-    ).then((_) => setState(() => _selectedPin = null));
+    ).then((_) => ref.read(selectedTruckPinProvider.notifier).state = null);
   }
 }
 

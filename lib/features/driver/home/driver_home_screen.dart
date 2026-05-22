@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/driver_provider.dart';
 import 'driver_map_screen.dart';
 import 'incoming_load_screen.dart';
 import '../profile/driver_settings_screen.dart';
 
 const _navy = Color(0xFF003F7D);
 
-class DriverHomeScreen extends StatefulWidget {
+class DriverHomeScreen extends ConsumerStatefulWidget {
   const DriverHomeScreen({super.key});
 
   @override
-  State<DriverHomeScreen> createState() => _DriverHomeScreenState();
+  ConsumerState<DriverHomeScreen> createState() => _DriverHomeScreenState();
 }
 
-class _DriverHomeScreenState extends State<DriverHomeScreen>
+class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen>
     with SingleTickerProviderStateMixin {
-  bool _isOnline = false;
   late TabController _tabController;
 
   @override
@@ -31,6 +32,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isOnline = ref.watch(driverOnlineProvider);
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -53,7 +56,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           ),
         ),
         actions: [
-          if (!_isOnline)
+          if (!isOnline)
             IconButton(
               icon: const Icon(Icons.notifications_outlined, color: Colors.black87),
               onPressed: () {},
@@ -74,35 +77,23 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [
-          _FindLoadsTab(
-            isOnline: _isOnline,
-            onToggle: (val) => setState(() => _isOnline = val),
-            onMapTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DriverMapScreen()),
-            ),
-          ),
-          const _MyTripsTab(),
+        children: const [
+          _FindLoadsTab(),
+          _MyTripsTab(),
         ],
       ),
     );
   }
 }
 
-class _FindLoadsTab extends StatelessWidget {
-  final bool isOnline;
-  final ValueChanged<bool> onToggle;
-  final VoidCallback onMapTap;
-
-  const _FindLoadsTab({
-    required this.isOnline,
-    required this.onToggle,
-    required this.onMapTap,
-  });
+// No props needed — reads driverOnlineProvider directly
+class _FindLoadsTab extends ConsumerWidget {
+  const _FindLoadsTab();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isOnline = ref.watch(driverOnlineProvider);
+
     return Column(
       children: [
         Expanded(
@@ -111,7 +102,7 @@ class _FindLoadsTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _OnlineToggleBanner(isOnline: isOnline, onToggle: onToggle),
+                const _OnlineToggleBanner(),
                 if (isOnline) ...[
                   const SizedBox(height: 16),
                   const _StatsRow(),
@@ -125,27 +116,19 @@ class _FindLoadsTab extends StatelessWidget {
             ),
           ),
         ),
-        _BottomActions(
-          isOnline: isOnline,
-          onMapTap: onMapTap,
-          onToggle: onToggle,
-        ),
+        const _BottomActions(),
       ],
     );
   }
 }
 
-class _OnlineToggleBanner extends StatelessWidget {
-  final bool isOnline;
-  final ValueChanged<bool> onToggle;
-
-  const _OnlineToggleBanner({
-    required this.isOnline,
-    required this.onToggle,
-  });
+class _OnlineToggleBanner extends ConsumerWidget {
+  const _OnlineToggleBanner();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isOnline = ref.watch(driverOnlineProvider);
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       width: double.infinity,
@@ -192,7 +175,8 @@ class _OnlineToggleBanner extends StatelessWidget {
           ),
           Switch(
             value: isOnline,
-            onChanged: onToggle,
+            onChanged: (val) =>
+                ref.read(driverOnlineProvider.notifier).state = val,
             activeThumbColor: Colors.white,
             activeTrackColor: const Color(0xFF2ECC71),
             inactiveThumbColor: Colors.white,
@@ -442,19 +426,14 @@ class _LoadCard extends StatelessWidget {
   }
 }
 
-class _BottomActions extends StatelessWidget {
-  final bool isOnline;
-  final VoidCallback onMapTap;
-  final ValueChanged<bool> onToggle;
-
-  const _BottomActions({
-    required this.isOnline,
-    required this.onMapTap,
-    required this.onToggle,
-  });
+// No props — reads/writes driverOnlineProvider directly, navigates internally
+class _BottomActions extends ConsumerWidget {
+  const _BottomActions();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isOnline = ref.watch(driverOnlineProvider);
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
       decoration: BoxDecoration(
@@ -466,7 +445,10 @@ class _BottomActions extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: onMapTap,
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const DriverMapScreen()),
+                    ),
                     icon: const Icon(Icons.map_outlined, color: Colors.black87, size: 20),
                     label: const Text(
                       'Map',
@@ -507,7 +489,8 @@ class _BottomActions extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: () => onToggle(true),
+                onPressed: () =>
+                    ref.read(driverOnlineProvider.notifier).state = true,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _navy,
                   foregroundColor: Colors.white,
@@ -526,7 +509,6 @@ class _BottomActions extends StatelessWidget {
   }
 }
 
-// Tappable wrapper around _LoadCard that opens IncomingLoadScreen
 class _TappableLoadCard extends StatelessWidget {
   final String company;
   final String location;
@@ -560,17 +542,11 @@ class _TappableLoadCard extends StatelessWidget {
   }
 }
 
-// ─── Screen 26: My Trips History ────────────────────────────────────────────
+// ─── My Trips Tab ────────────────────────────────────────────────────────────
 
-class _MyTripsTab extends StatefulWidget {
+// Stateless now — filter state lives in tripFilterProvider
+class _MyTripsTab extends ConsumerWidget {
   const _MyTripsTab();
-
-  @override
-  State<_MyTripsTab> createState() => _MyTripsTabState();
-}
-
-class _MyTripsTabState extends State<_MyTripsTab> {
-  int _filter = 0; // 0=All, 1=Completed, 2=Cancelled
 
   static const _trips = [
     _TripRecord(
@@ -602,40 +578,53 @@ class _MyTripsTabState extends State<_MyTripsTab> {
     ),
   ];
 
-  List<_TripRecord> get _filtered {
-    if (_filter == 1) return _trips.where((t) => t.isCompleted).toList();
-    if (_filter == 2) return _trips.where((t) => !t.isCompleted).toList();
-    return _trips;
-  }
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final filter = ref.watch(tripFilterProvider);
+    final filtered = filter == 1
+        ? _trips.where((t) => t.isCompleted).toList()
+        : filter == 2
+            ? _trips.where((t) => !t.isCompleted).toList()
+            : _trips;
+
     return Column(
       children: [
-        // Filter chips
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
           child: Row(
             children: [
-              _FilterChipBtn(label: 'All', selected: _filter == 0, onTap: () => setState(() => _filter = 0)),
+              _FilterChipBtn(
+                label: 'All',
+                selected: filter == 0,
+                onTap: () => ref.read(tripFilterProvider.notifier).state = 0,
+              ),
               const SizedBox(width: 8),
-              _FilterChipBtn(label: 'Completed', selected: _filter == 1, onTap: () => setState(() => _filter = 1)),
+              _FilterChipBtn(
+                label: 'Completed',
+                selected: filter == 1,
+                onTap: () => ref.read(tripFilterProvider.notifier).state = 1,
+              ),
               const SizedBox(width: 8),
-              _FilterChipBtn(label: 'Cancelled', selected: _filter == 2, onTap: () => setState(() => _filter = 2)),
+              _FilterChipBtn(
+                label: 'Cancelled',
+                selected: filter == 2,
+                onTap: () => ref.read(tripFilterProvider.notifier).state = 2,
+              ),
             ],
           ),
         ),
         const SizedBox(height: 12),
         Expanded(
-          child: _filtered.isEmpty
+          child: filtered.isEmpty
               ? const Center(
-                  child: Text('No trips found', style: TextStyle(color: Colors.black45)),
+                  child: Text('No trips found',
+                      style: TextStyle(color: Colors.black45)),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _filtered.length,
+                  itemCount: filtered.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) => _TripHistoryCard(trip: _filtered[i]),
+                  itemBuilder: (_, i) => _TripHistoryCard(trip: filtered[i]),
                 ),
         ),
       ],

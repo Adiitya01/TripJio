@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../driver/home/driver_home_screen.dart';
 import '../load_owner/home/load_owner_home_screen.dart';
 
@@ -72,7 +73,12 @@ class LocationPermissionScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('isLoggedIn', true);
+                    await prefs.setString(
+                        'userType', isDriver ? 'driver' : 'loadOwner');
+                    if (!context.mounted) return;
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
                         builder: (_) => isDriver

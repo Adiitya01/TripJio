@@ -1,20 +1,18 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'phone_entry_screen.dart';
 
 enum UserType { load, truck }
 
-class UserTypeScreen extends StatefulWidget {
+// Persists the selected user type across the auth flow
+final selectedUserTypeProvider = StateProvider<UserType?>((ref) => null);
+
+class UserTypeScreen extends ConsumerWidget {
   const UserTypeScreen({super.key});
 
   @override
-  State<UserTypeScreen> createState() => _UserTypeScreenState();
-}
-
-class _UserTypeScreenState extends State<UserTypeScreen> {
-  UserType? _selected;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(selectedUserTypeProvider);
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -75,28 +73,28 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                 icon: Icons.inventory_2_outlined,
                 title: 'I have Loads',
                 subtitle: 'Find trucks for your shipments',
-                selected: _selected == UserType.load,
-                onTap: () => setState(() => _selected = UserType.load),
+                selected: selected == UserType.load,
+                onTap: () => ref.read(selectedUserTypeProvider.notifier).state = UserType.load,
               ),
               const SizedBox(height: 16),
               _UserTypeCard(
                 icon: Icons.local_shipping_outlined,
                 title: 'I have a Truck',
                 subtitle: 'Find loads near you',
-                selected: _selected == UserType.truck,
-                onTap: () => setState(() => _selected = UserType.truck),
+                selected: selected == UserType.truck,
+                onTap: () => ref.read(selectedUserTypeProvider.notifier).state = UserType.truck,
               ),
               const Spacer(),
               SizedBox(
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _selected == null
+                  onPressed: selected == null
                       ? null
                       : () => Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) =>
-                                  PhoneEntryScreen(userType: _selected!),
+                                  PhoneEntryScreen(userType: selected),
                             ),
                           ),
                   style: ElevatedButton.styleFrom(
