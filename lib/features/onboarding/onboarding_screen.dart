@@ -1,5 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../auth/user_type_screen.dart';
+
+const _navy = Color(0xFF003F7D);
+const _amber = Color(0xFFF59E0B);
+const _darkCard = Color(0xFF001F3F);
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -9,15 +14,11 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _SlideData {
-  final Color bgColor;
-  final Color circleColor;
   final IconData icon;
   final String title;
   final String subtitle;
 
   const _SlideData({
-    required this.bgColor,
-    required this.circleColor,
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -30,25 +31,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   static const _slides = [
     _SlideData(
-      bgColor: Color(0xFFE6EEF8),
-      circleColor: Color(0xFF003F7D),
-      icon: Icons.location_on,
+      icon: Icons.location_on_rounded,
       title: 'Find Trucks\nNear You',
       subtitle: 'Live GPS map shows all available trucks within your area.',
     ),
     _SlideData(
-      bgColor: Color(0xFFE8EEF6),
-      circleColor: Color(0xFF1B3A6B),
       icon: Icons.upload_rounded,
       title: 'Connect\nDirectly',
       subtitle: 'Send a request or call drivers. No middlemen.',
     ),
     _SlideData(
-      bgColor: Color(0xFFE8F0E8),
-      circleColor: Color(0xFF2A9E6E),
-      icon: Icons.route,
+      icon: Icons.route_rounded,
       title: 'Track in\nReal-Time',
-      subtitle: 'Live track your driver until pickup.',
+      subtitle: 'Live track your driver from pickup to delivery.',
     ),
   ];
 
@@ -84,16 +79,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Skip button
             Align(
               alignment: Alignment.topRight,
               child: TextButton(
                 onPressed: _skip,
-                child: const Text(
+                child: Text(
                   'Skip',
-                  style: TextStyle(color: Colors.black54, fontSize: 16),
+                  style: GoogleFonts.poppins(
+                    color: Colors.black45,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
+
+            // Slides
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
@@ -106,46 +108,45 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Dark card with amber icon
                         Container(
                           width: double.infinity,
-                          height: 280,
+                          height: 300,
                           decoration: BoxDecoration(
-                            color: slide.bgColor,
-                            borderRadius: BorderRadius.circular(16),
+                            color: _darkCard,
+                            borderRadius: BorderRadius.circular(24),
                           ),
                           child: Center(
-                            child: Container(
-                              width: 130,
-                              height: 130,
-                              decoration: BoxDecoration(
-                                color: slide.circleColor,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                slide.icon,
-                                color: Colors.black,
-                                size: 60,
-                              ),
+                            child: Icon(
+                              slide.icon,
+                              color: _amber,
+                              size: 90,
                             ),
                           ),
                         ),
-                        const SizedBox(height: 32),
+
+                        const SizedBox(height: 36),
+
+                        // Bold Poppins headline
                         Text(
                           slide.title,
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                            height: 1.2,
+                          style: GoogleFonts.poppins(
+                            fontSize: 38,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black87,
+                            height: 1.15,
                           ),
                         ),
+
                         const SizedBox(height: 12),
+
                         Text(
                           slide.subtitle,
-                          style: const TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: 16,
-                            color: Colors.black54,
-                            height: 1.5,
+                            color: Colors.black45,
+                            fontWeight: FontWeight.w400,
+                            height: 1.6,
                           ),
                         ),
                       ],
@@ -154,10 +155,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 },
               ),
             ),
+
+            // Dots + button
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
               child: Column(
                 children: [
+                  // Dots
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(_slides.length, (i) {
@@ -168,21 +172,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         height: 8,
                         decoration: BoxDecoration(
                           color: i == _currentPage
-                              ? const Color(0xFF003F7D)
+                              ? _amber
                               : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );
                     }),
                   ),
+
                   const SizedBox(height: 20),
+
+                  // CTA button — amber
                   SizedBox(
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
                       onPressed: _next,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF003F7D),
+                        backgroundColor: _navy,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(28),
@@ -191,11 +198,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       child: Text(
                         _currentPage == _slides.length - 1
-                            ? 'Get Started →'
-                            : 'Next',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                            ? 'Get Started  →'
+                            : 'Next  →',
+                        style: GoogleFonts.poppins(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
                       ),
                     ),

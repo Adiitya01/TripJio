@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../providers/driver_provider.dart';
 import 'driver_map_screen.dart';
 import 'incoming_load_screen.dart';
 import '../profile/driver_settings_screen.dart';
 
 const _navy = Color(0xFF003F7D);
+const _amber = Color(0xFFF59E0B);
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
   const DriverHomeScreen({super.key});
@@ -47,11 +49,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen>
             MaterialPageRoute(builder: (_) => const DriverSettingsScreen()),
           ),
         ),
-        title: const Text(
+        title: Text(
           'TripJio',
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             color: Colors.black87,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w700,
             fontSize: 20,
           ),
         ),
@@ -68,7 +70,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen>
           unselectedLabelColor: Colors.grey,
           indicatorColor: _navy,
           indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+          labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15),
           tabs: const [
             Tab(text: 'Find Loads'),
             Tab(text: 'My Trips'),
@@ -154,8 +156,8 @@ class _OnlineToggleBanner extends ConsumerWidget {
               children: [
                 Text(
                   isOnline ? "You're Online" : "You're Offline",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
                     fontSize: 16,
                     color: isOnline ? Colors.white : Colors.black87,
                   ),
@@ -165,7 +167,7 @@ class _OnlineToggleBanner extends ConsumerWidget {
                   isOnline
                       ? 'Receiving load requests'
                       : 'Go online to find loads',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 13,
                     color: isOnline ? Colors.white70 : Colors.black54,
                   ),
@@ -210,19 +212,23 @@ class _OfflineEmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Go online to start',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: 20,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
               color: Colors.black87,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Turn on availability to see\nnearby load opportunities',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Colors.black54, height: 1.5),
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Colors.black54,
+              height: 1.5,
+            ),
           ),
         ],
       ),
@@ -267,15 +273,15 @@ class _StatCard extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(fontSize: 12, color: Colors.black54),
+              style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
             ),
             const SizedBox(height: 4),
             Text(
               value,
-              style: const TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                fontWeight: FontWeight.w700,
+                color: _amber,
               ),
             ),
           ],
@@ -296,16 +302,22 @@ class _NearbyLoadsSection extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Nearby Loads',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             TextButton(
               onPressed: () {},
               style: TextButton.styleFrom(padding: EdgeInsets.zero),
-              child: const Text(
+              child: Text(
                 'See All',
-                style: TextStyle(color: _navy, fontWeight: FontWeight.w600),
+                style: GoogleFonts.poppins(
+                  color: _navy,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -331,7 +343,7 @@ class _NearbyLoadsSection extends StatelessWidget {
   }
 }
 
-class _LoadCard extends StatelessWidget {
+class _LoadCard extends StatefulWidget {
   final String company;
   final String location;
   final String vehicleType;
@@ -347,14 +359,37 @@ class _LoadCard extends StatelessWidget {
   });
 
   @override
+  State<_LoadCard> createState() => _LoadCardState();
+}
+
+class _LoadCardState extends State<_LoadCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(
-          color: isNew ? _navy : Colors.grey.shade200,
-          width: isNew ? 1.5 : 1,
+          color: widget.isNew ? _amber : Colors.grey.shade200,
+          width: widget.isNew ? 1.5 : 1,
         ),
         borderRadius: BorderRadius.circular(10),
       ),
@@ -364,25 +399,25 @@ class _LoadCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                company,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
+                widget.company,
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700,
                   fontSize: 15,
                   color: Colors.black87,
                 ),
               ),
-              if (isNew)
+              if (widget.isNew)
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: _navy,
+                    color: _amber,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text(
                     'NEW',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Colors.black87,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
@@ -397,7 +432,7 @@ class _LoadCard extends StatelessWidget {
                   size: 14, color: Colors.black45),
               const SizedBox(width: 4),
               Text(
-                location,
+                widget.location,
                 style: const TextStyle(fontSize: 13, color: Colors.black54),
               ),
             ],
@@ -407,11 +442,11 @@ class _LoadCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                vehicleType,
+                widget.vehicleType,
                 style: const TextStyle(fontSize: 13, color: Colors.black54),
               ),
               Text(
-                tripDistance,
+                widget.tripDistance,
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -419,6 +454,81 @@ class _LoadCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          // Animated truck route
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final trackWidth = constraints.maxWidth;
+              return AnimatedBuilder(
+                animation: _ctrl,
+                builder: (context, _) {
+                  final t = _ctrl.value;
+                  return SizedBox(
+                    height: 22,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Track line
+                        Positioned(
+                          left: 4,
+                          right: 4,
+                          top: 10,
+                          child: Container(
+                              height: 1.5, color: Colors.grey.shade200),
+                        ),
+                        // Amber progress line
+                        Positioned(
+                          left: 4,
+                          top: 10,
+                          child: Container(
+                            height: 1.5,
+                            width: (t * (trackWidth - 8)).clamp(0.0, trackWidth - 8),
+                            color: _amber.withOpacity(0.5),
+                          ),
+                        ),
+                        // Origin dot
+                        Positioned(
+                          left: 0,
+                          top: 7,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _navy,
+                            ),
+                          ),
+                        ),
+                        // Animated truck
+                        Positioned(
+                          left: (t * (trackWidth - 20)).clamp(0.0, trackWidth - 20),
+                          top: 1,
+                          child: const Icon(
+                            Icons.local_shipping,
+                            size: 20,
+                            color: _amber,
+                          ),
+                        ),
+                        // Destination dot
+                        Positioned(
+                          right: 0,
+                          top: 7,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.grey.shade400,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
           ),
         ],
       ),
@@ -450,9 +560,13 @@ class _BottomActions extends ConsumerWidget {
                       MaterialPageRoute(builder: (_) => const DriverMapScreen()),
                     ),
                     icon: const Icon(Icons.map_outlined, color: Colors.black87, size: 20),
-                    label: const Text(
+                    label: Text(
                       'Map',
-                      style: TextStyle(color: Colors.black87, fontSize: 15),
+                      style: GoogleFonts.poppins(
+                        color: Colors.black87,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -469,9 +583,13 @@ class _BottomActions extends ConsumerWidget {
                   child: ElevatedButton.icon(
                     onPressed: () {},
                     icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
-                    label: const Text(
+                    label: Text(
                       'Refresh',
-                      style: TextStyle(color: Colors.white, fontSize: 15),
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _navy,
@@ -499,9 +617,12 @@ class _BottomActions extends ConsumerWidget {
                   ),
                   elevation: 0,
                 ),
-                child: const Text(
+                child: Text(
                   'Go Online',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -676,7 +797,7 @@ class _FilterChipBtn extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: selected ? Colors.white : Colors.black54,
@@ -721,7 +842,7 @@ class _TripHistoryCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     trip.status,
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: statusColor,
@@ -732,7 +853,10 @@ class _TripHistoryCard extends StatelessWidget {
               ),
               Text(
                 trip.time,
-                style: const TextStyle(fontSize: 12, color: Colors.black45),
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: Colors.black45,
+                ),
               ),
             ],
           ),
@@ -750,8 +874,8 @@ class _TripHistoryCard extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 '${trip.from}  →  ${trip.to}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700,
                   fontSize: 14,
                   color: Colors.black87,
                 ),
@@ -763,12 +887,15 @@ class _TripHistoryCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(trip.customer,
-                  style: const TextStyle(fontSize: 13, color: Colors.black54)),
-              Text(trip.distance,
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 13,
                     color: Colors.black54,
-                    fontWeight: FontWeight.w500,
+                  )),
+              Text(trip.distance,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
                   )),
             ],
           ),

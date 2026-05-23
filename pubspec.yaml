@@ -26,6 +26,7 @@ dependencies:
   flutter_riverpod: ^2.6.1 # Standard for controllers/state management
   shimmer: ^3.0.0
   flutter_native_splash: ^2.4.0
+  google_fonts: ^6.2.0
 
 dev_dependencies:
   flutter_test:

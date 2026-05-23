@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../providers/load_owner_provider.dart';
 import 'drivers_list_screen.dart';
 import 'send_request_screen.dart';
 
 const _navy = Color(0xFF003F7D);
 const _navyLight = Color(0xFFE6EEF8);
+const _amber = Color(0xFFF59E0B);
+
+String _initials(String name) {
+  final parts = name.trim().split(' ');
+  if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  return name.substring(0, 2).toUpperCase();
+}
 
 class LoadOwnerHomeScreen extends ConsumerStatefulWidget {
   const LoadOwnerHomeScreen({super.key});
@@ -42,11 +50,11 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
                     icon: const Icon(Icons.menu, color: Colors.black87),
                     onPressed: () {},
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'TripJio',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700,
                         fontSize: 20,
                         color: Colors.black87,
                       ),
@@ -144,10 +152,10 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         '12 trucks nearby',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w700,
                           fontSize: 16,
                           color: Colors.black87,
                         ),
@@ -158,9 +166,9 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
                           MaterialPageRoute(
                               builder: (_) => const DriversListScreen()),
                         ),
-                        child: const Text(
+                        child: Text(
                           'List view',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             color: _navy,
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
@@ -179,13 +187,16 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
                       borderRadius: BorderRadius.circular(22),
                     ),
                     child: Row(
-                      children: const [
-                        SizedBox(width: 14),
-                        Icon(Icons.search, color: Colors.black45, size: 20),
-                        SizedBox(width: 8),
+                      children: [
+                        const SizedBox(width: 14),
+                        const Icon(Icons.search, color: Colors.black45, size: 20),
+                        const SizedBox(width: 8),
                         Text(
                           'Search pickup location',
-                          style: TextStyle(color: Colors.black45, fontSize: 14),
+                          style: GoogleFonts.poppins(
+                            color: Colors.black45,
+                            fontSize: 14,
+                          ),
                         ),
                       ],
                     ),
@@ -248,11 +259,25 @@ class _DriverDetailsSheet extends StatelessWidget {
                     Container(
                       width: 60,
                       height: 60,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.grey.shade200,
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF003F7D), Color(0xFF1565C0)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                       ),
-                      child: const Icon(Icons.person, size: 34, color: Colors.black54),
+                      child: Center(
+                        child: Text(
+                          _initials(truck.name),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
                     ),
                     Positioned(
                       bottom: 2,
@@ -275,8 +300,8 @@ class _DriverDetailsSheet extends StatelessWidget {
                   children: [
                     Text(
                       truck.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700,
                         fontSize: 18,
                         color: Colors.black87,
                       ),
@@ -284,11 +309,23 @@ class _DriverDetailsSheet extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.star, size: 15, color: Colors.amber),
+                        const Icon(Icons.star_rounded, size: 16, color: _amber),
                         const SizedBox(width: 4),
                         Text(
-                          '${truck.rating} · ${truck.trips} trips',
-                          style: const TextStyle(fontSize: 13, color: Colors.black54),
+                          '${truck.rating}',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '· ${truck.trips} trips',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: Colors.black45,
+                          ),
                         ),
                       ],
                     ),
@@ -339,9 +376,13 @@ class _DriverDetailsSheet extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: () {},
                       icon: const Icon(Icons.phone_outlined, size: 18, color: Colors.black87),
-                      label: const Text(
+                      label: Text(
                         'Call',
-                        style: TextStyle(color: Colors.black87, fontSize: 15, fontWeight: FontWeight.w600),
+                        style: GoogleFonts.poppins(
+                          color: Colors.black87,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -369,9 +410,13 @@ class _DriverDetailsSheet extends StatelessWidget {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                         elevation: 0,
                       ),
-                      child: const Text(
+                      child: Text(
                         'Send Request',
-                        style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -398,7 +443,7 @@ class _StatCell extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: 11,
             color: Colors.black45,
             fontWeight: FontWeight.w600,
@@ -408,9 +453,9 @@ class _StatCell extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: 15,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w700,
             color: Colors.black87,
           ),
         ),
@@ -467,7 +512,7 @@ class _TypeChip extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: selected ? Colors.white : Colors.black87,

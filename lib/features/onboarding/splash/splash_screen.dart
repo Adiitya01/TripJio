@@ -1,7 +1,7 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'widgets/skeleton_screens.dart';
 import '../onboarding_screen.dart';
 import '../../driver/home/driver_home_screen.dart';
 import '../../load_owner/home/load_owner_home_screen.dart';
@@ -15,28 +15,30 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
+  // Phase 1 – logo fades in and scales up
   late AnimationController _introController;
   late Animation<double> _logoFadeAnimation;
   late Animation<double> _logoScaleAnimation;
 
+  // Phase 2 – circle halves slide apart
   late AnimationController _splitController;
   late Animation<double> _splitAnimation;
 
-  Widget? _backgroundWidget;
+  // Phase 3 – truck drives off right edge; circle halves + text fade out
+  late AnimationController _exitController;
+  late Animation<double> _truckSlideAnimation;
+  late Animation<double> _contentFadeAnimation;
 
   @override
   void initState() {
     super.initState();
 
-    // 1. Remove the native splash screen after the first frame is rendered
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FlutterNativeSplash.remove();
     });
 
-    // 2. Start preloading data IMMEDIATELY in parallel
     final dataPreloadFuture = _preloadAppData();
 
-    // 3. Initialize Animations
     _introController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -52,14 +54,28 @@ class _SplashScreenState extends State<SplashScreen>
 
     _splitController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 520),
     );
     _splitAnimation = CurvedAnimation(
       parent: _splitController,
       curve: Curves.easeInOutCubic,
     );
 
-    // 4. Start entry animation and coordinate split
+    _exitController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    // Truck starts slow then accelerates hard off screen
+    _truckSlideAnimation = CurvedAnimation(
+      parent: _exitController,
+      curve: Curves.easeInQuart,
+    );
+    // Text + circle fade out in the first 55 % of the exit phase
+    _contentFadeAnimation = CurvedAnimation(
+      parent: _exitController,
+      curve: const Interval(0.0, 0.55, curve: Curves.easeOut),
+    );
+
     _introController.forward().then((_) {
       dataPreloadFuture.then((appData) {
         if (!mounted) return;
@@ -76,46 +92,45 @@ class _SplashScreenState extends State<SplashScreen>
           nextScreen = const OnboardingScreen();
         }
 
-        setState(() {
-          if (isLoggedIn && userType != null) {
-            _backgroundWidget = userType == 'driver'
-                ? const DriverHomeSkeleton()
-                : const LoadOwnerHomeSkeleton();
-          } else {
-            _backgroundWidget = const OnboardingScreen();
-          }
-        });
-
-
-        // 5. Trigger the split door animation
+        // Circle splits open …
         _splitController.forward().then((_) {
           if (!mounted) return;
-          // Navigate to the next screen immediately without further transitions
-          Navigator.of(context).pushReplacement(
-            PageRouteBuilder(
-              pageBuilder: (_, __, ___) => nextScreen,
-              transitionDuration: Duration.zero,
-            ),
-          );
+          // … then truck drives away
+          _exitController.forward().then((_) {
+            if (!mounted) return;
+            Navigator.of(context).pushReplacement(
+              PageRouteBuilder(
+                pageBuilder: (_, __, ___) => nextScreen,
+                transitionsBuilder: (_, animation, __, child) {
+                  return SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.06),
+                      end: Offset.zero,
+                    ).animate(CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    )),
+                    child: FadeTransition(opacity: animation, child: child),
+                  );
+                },
+                transitionDuration: const Duration(milliseconds: 350),
+              ),
+            );
+          });
         });
       });
     });
   }
 
   Future<Map<String, dynamic>> _preloadAppData() async {
-    // Concurrently fetch local settings and simulate minor API latency (GPS, active list pre-fetch)
     final results = await Future.wait([
       SharedPreferences.getInstance(),
-      Future.delayed(const Duration(milliseconds: 1200)),
+      Future.delayed(const Duration(milliseconds: 2500)),
     ]);
-
     final prefs = results[0] as SharedPreferences;
-    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-    final userType = prefs.getString('userType');
-
     return {
-      'isLoggedIn': isLoggedIn,
-      'userType': userType,
+      'isLoggedIn': prefs.getBool('isLoggedIn') ?? false,
+      'userType': prefs.getString('userType'),
     };
   }
 
@@ -123,102 +138,8 @@ class _SplashScreenState extends State<SplashScreen>
   void dispose() {
     _introController.dispose();
     _splitController.dispose();
+    _exitController.dispose();
     super.dispose();
-  }
-
-  Widget _buildFullSplashContent(BuildContext context) {
-    // Fade out logo and text in the first 35% of the splitting animation
-    final double splitOpacity = (1.0 - (_splitAnimation.value / 0.35)).clamp(0.0, 1.0);
-
-    return ColoredBox(
-      color: const Color(0xFF003F7D),
-      child: Opacity(
-        opacity: splitOpacity,
-        child: Column(
-          children: [
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    AnimatedBuilder(
-                      animation: _introController,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: 0.8 + (_logoScaleAnimation.value * 0.2),
-                          child: Opacity(
-                            opacity: _logoFadeAnimation.value,
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.25),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.local_shipping_outlined,
-                          color: Colors.black,
-                          size: 60,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    AnimatedBuilder(
-                      animation: _introController,
-                      builder: (context, child) {
-                        return Opacity(
-                          opacity: _logoFadeAnimation.value,
-                          child: child,
-                        );
-                      },
-                      child: Column(
-                        children: const [
-                          Text(
-                            'TripJio',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 52,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Find · Connect · Go',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 32),
-              child: Text(
-                'Made in India',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
@@ -227,62 +148,170 @@ class _SplashScreenState extends State<SplashScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFF003F7D),
-      body: Stack(
-        children: [
-          // 1. Target Screen / Skeleton Screen revealed behind the splitting doors
-          if (_backgroundWidget != null) _backgroundWidget!,
+      body: AnimatedBuilder(
+        animation: Listenable.merge(
+            [_introController, _splitController, _exitController]),
+        builder: (context, _) {
+          // How far each circle half has travelled (px from centre)
+          final splitOffset =
+              _splitAnimation.value * 68.0 + _exitController.value * 68.0;
 
-          // 2. The Splitting Splash Doors
-          AnimatedBuilder(
-            animation: _splitController,
-            builder: (context, child) {
-              final double offset = _splitAnimation.value * (size.height / 2);
+          // Truck slides from centre to right edge
+          final truckOffset =
+              _truckSlideAnimation.value * (size.width / 2 + 30);
 
-              return Stack(
-                children: [
-                  // Top half of Splash Screen
-                  Positioned(
-                    top: -offset,
-                    left: 0,
-                    right: 0,
-                    height: size.height / 2,
-                    child: ClipRect(
-                      child: OverflowBox(
-                        alignment: Alignment.topCenter,
-                        maxHeight: size.height,
-                        child: SizedBox(
-                          width: size.width,
-                          height: size.height,
-                          child: _buildFullSplashContent(context),
+          // Opacity shared by text, circle, and "Made in India"
+          final visibleOpacity =
+              (1.0 - _contentFadeAnimation.value).clamp(0.0, 1.0);
+
+          final circleOpacity = _logoFadeAnimation.value * visibleOpacity;
+          final textOpacity = _logoFadeAnimation.value * visibleOpacity;
+          final scale = 0.8 + (_logoScaleAnimation.value * 0.2);
+
+          return Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // ── Circle halves + truck ──────────────────────────
+                      Transform.scale(
+                        scale: scale,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          clipBehavior: Clip.none,
+                          children: [
+                            // Animated split circle drawn with CustomPainter
+                            CustomPaint(
+                              size: const Size(120, 120),
+                              painter: _SplitCirclePainter(
+                                splitOffset: splitOffset,
+                                opacity: circleOpacity,
+                              ),
+                            ),
+                            // Only the truck icon slides right
+                            Transform.translate(
+                              offset: Offset(truckOffset, 0),
+                              child: Opacity(
+                                opacity: _logoFadeAnimation.value,
+                                child: const Icon(
+                                  Icons.local_shipping_outlined,
+                                  color: Colors.black,
+                                  size: 60,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ),
-                  // Bottom half of Splash Screen
-                  Positioned(
-                    bottom: -offset,
-                    left: 0,
-                    right: 0,
-                    height: size.height / 2,
-                    child: ClipRect(
-                      child: OverflowBox(
-                        alignment: Alignment.bottomCenter,
-                        maxHeight: size.height,
-                        child: SizedBox(
-                          width: size.width,
-                          height: size.height,
-                          child: _buildFullSplashContent(context),
+
+                      const SizedBox(height: 32),
+
+                      // ── Text ───────────────────────────────────────────
+                      Opacity(
+                        opacity: textOpacity,
+                        child: const Column(
+                          children: [
+                            Text(
+                              'TripJio',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 52,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Find · Connect · Go',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Made in India ──────────────────────────────────────────
+              Opacity(
+                opacity: textOpacity,
+                child: const Padding(
+                  padding: EdgeInsets.only(bottom: 32),
+                  child: Text(
+                    'Made in India',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                ],
-              );
-            },
-          ),
-        ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
+// ── Custom painter for the splitting circle ────────────────────────────────────
+
+class _SplitCirclePainter extends CustomPainter {
+  final double splitOffset; // pixels each half has moved from centre
+  final double opacity;
+
+  const _SplitCirclePainter({
+    required this.splitOffset,
+    required this.opacity,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (opacity <= 0) return;
+
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.25 * opacity);
+
+    final center = Offset(size.width / 2, size.height / 2);
+    const radius = 60.0;
+
+    // Top semicircle – slides upward
+    canvas.save();
+    canvas.translate(0, -splitOffset);
+    canvas.drawPath(
+      Path()
+        // start at left (π), sweep π clockwise → traces the TOP arc
+        ..addArc(
+            Rect.fromCircle(center: center, radius: radius), math.pi, math.pi)
+        ..close(), // chord closes the semicircle
+      paint,
+    );
+    canvas.restore();
+
+    // Bottom semicircle – slides downward
+    canvas.save();
+    canvas.translate(0, splitOffset);
+    canvas.drawPath(
+      Path()
+        // start at right (0), sweep π clockwise → traces the BOTTOM arc
+        ..addArc(Rect.fromCircle(center: center, radius: radius), 0, math.pi)
+        ..close(),
+      paint,
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_SplitCirclePainter old) =>
+      old.splitOffset != splitOffset || old.opacity != opacity;
+}
