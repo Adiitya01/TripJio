@@ -32,9 +32,9 @@ class TripAcceptedScreen extends StatelessWidget {
                     child: const Icon(Icons.check, color: Colors.white, size: 26),
                   ),
                   const SizedBox(width: 14),
-                  Column(
+                  const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Trip Confirmed',
                         style: TextStyle(
@@ -80,10 +80,10 @@ class TripAcceptedScreen extends StatelessWidget {
                                 color: Colors.black54, size: 28),
                           ),
                           const SizedBox(width: 12),
-                          Expanded(
+                          const Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
+                              children: [
                                 Text(
                                   'Rajesh Sharma',
                                   style: TextStyle(
@@ -145,9 +145,9 @@ class TripAcceptedScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              Column(
+                              const Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: const [
+                                children: [
                                   Text(
                                     'PICKUP',
                                     style: TextStyle(
@@ -204,9 +204,9 @@ class TripAcceptedScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              Column(
+                              const Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: const [
+                                children: [
                                   Text(
                                     'DROP',
                                     style: TextStyle(
@@ -241,9 +241,9 @@ class TripAcceptedScreen extends StatelessWidget {
                         color: _navyLight,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Column(
+                      child: const Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'LOAD DETAILS',
                             style: TextStyle(

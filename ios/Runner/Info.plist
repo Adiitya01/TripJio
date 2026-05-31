@@ -66,6 +66,10 @@
 			<string>UIInterfaceOrientationLandscapeLeft</string>
 			<string>UIInterfaceOrientationLandscapeRight</string>
 		</array>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>TripJio needs your location to show nearby trucks on the map.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>TripJio needs your location to show nearby trucks on the map.</string>
 		<key>UIStatusBarHidden</key>
 		<true/>
 		<key>UIViewControllerBasedStatusBarAppearance</key>

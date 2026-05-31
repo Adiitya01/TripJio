@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'driver_arrived_screen.dart';
 
@@ -138,7 +137,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                   ),
                   const Spacer(),
                   Text(
-                    '${_minutesLeft} min',
+                    '$_minutesLeft min',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -207,7 +206,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                         Container(
                           width: 48,
                           height: 48,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             color: _navyLight,
                           ),

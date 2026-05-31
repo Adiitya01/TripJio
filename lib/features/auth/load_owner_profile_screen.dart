@@ -123,7 +123,7 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
                     _label('CITY'),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
-                      value: _selectedCity,
+                      initialValue: _selectedCity,
                       hint: const Text('Select city',
                           style: TextStyle(color: Colors.black38)),
                       decoration: InputDecoration(

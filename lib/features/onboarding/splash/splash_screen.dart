@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -128,9 +129,18 @@ class _SplashScreenState extends State<SplashScreen>
       Future.delayed(const Duration(milliseconds: 2500)),
     ]);
     final prefs = results[0] as SharedPreferences;
+
+    // Use Firebase Auth as the source of truth for login state
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    final isLoggedIn = firebaseUser != null;
+
+    // User type (driver/loadOwner) is stored in SharedPreferences
+    // since Firebase Auth doesn't know about app-specific roles
+    final userType = prefs.getString('userType');
+
     return {
-      'isLoggedIn': prefs.getBool('isLoggedIn') ?? false,
-      'userType': prefs.getString('userType'),
+      'isLoggedIn': isLoggedIn,
+      'userType': userType,
     };
   }
 

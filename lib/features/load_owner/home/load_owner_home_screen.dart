@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import '../providers/load_owner_provider.dart';
 import 'drivers_list_screen.dart';
 import 'send_request_screen.dart';
@@ -24,16 +26,98 @@ class LoadOwnerHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
-  static const _trucks = [
-    _TruckPin(name: 'Suresh Patil', vehicle: 'Mini Truck', number: 'MH 14 AB 1234', capacity: '800 kg', distance: '2.4 km', rating: 4.8, trips: 234, dx: 0.62, dy: 0.30),
-    _TruckPin(name: 'Ramesh Kumar', vehicle: 'LCV', number: 'MH 12 CD 5678', capacity: '1200 kg', distance: '3.7 km', rating: 4.6, trips: 187, dx: 0.25, dy: 0.52),
-    _TruckPin(name: 'Anil Yadav', vehicle: 'HCV', number: 'MH 04 EF 9012', capacity: '2500 kg', distance: '5.1 km', rating: 4.9, trips: 312, dx: 0.70, dy: 0.62),
+  static const _truckData = [
+    (name: 'Suresh Patil', vehicle: 'Mini Truck', number: 'MH 14 AB 1234', capacity: '800 kg', distance: '2.4 km', rating: 4.8, trips: 234, dLat: 0.018, dLng: -0.021),
+    (name: 'Ramesh Kumar', vehicle: 'LCV', number: 'MH 12 CD 5678', capacity: '1200 kg', distance: '3.7 km', rating: 4.6, trips: 187, dLat: -0.016, dLng: -0.048),
+    (name: 'Anil Yadav', vehicle: 'HCV', number: 'MH 04 EF 9012', capacity: '2500 kg', distance: '5.1 km', rating: 4.9, trips: 312, dLat: -0.003, dLng: 0.005),
   ];
+
+  List<_TruckPin> get _trucks => _truckData.map((t) => _TruckPin(
+    name: t.name,
+    vehicle: t.vehicle,
+    number: t.number,
+    capacity: t.capacity,
+    distance: t.distance,
+    rating: t.rating,
+    trips: t.trips,
+    lat: _mapCenter.latitude + t.dLat,
+    lng: _mapCenter.longitude + t.dLng,
+  )).toList();
+
+  GoogleMapController? _mapController;
+  LatLng _mapCenter = const LatLng(19.0760, 72.8777);
+  bool _loadingLocation = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCurrentLocation();
+  }
+
+  Future<void> _fetchCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() => _loadingLocation = false);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() => _loadingLocation = false);
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() => _loadingLocation = false);
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+
+      final newCenter = LatLng(position.latitude, position.longitude);
+      setState(() {
+        _mapCenter = newCenter;
+        _loadingLocation = false;
+      });
+
+      _mapController?.animateCamera(CameraUpdate.newLatLng(newCenter));
+    } catch (_) {
+      setState(() => _loadingLocation = false);
+    }
+  }
+
+  Set<Marker> _buildMarkers() {
+    return _trucks.asMap().entries.map((entry) {
+      final i = entry.key;
+      final truck = entry.value;
+      return Marker(
+        markerId: MarkerId('truck_$i'),
+        position: LatLng(truck.lat, truck.lng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        infoWindow: InfoWindow(title: truck.name, snippet: truck.vehicle),
+        onTap: () {
+          ref.read(selectedTruckPinProvider.notifier).state = i;
+          _showDriverSheet(context, truck);
+        },
+      );
+    }).toSet();
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final selectedType = ref.watch(vehicleTypeFilterProvider);
-    final selectedPin = ref.watch(selectedTruckPinProvider);
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
@@ -72,7 +156,37 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
           Expanded(
             child: Stack(
               children: [
-                SizedBox.expand(child: CustomPaint(painter: _MapPainter())),
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: _mapCenter,
+                    zoom: 13,
+                  ),
+                  markers: _buildMarkers(),
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: false,
+                  zoomControlsEnabled: false,
+                  mapToolbarEnabled: false,
+                  onMapCreated: (controller) {
+                    _mapController = controller;
+                    if (!_loadingLocation) {
+                      controller.animateCamera(CameraUpdate.newLatLng(_mapCenter));
+                    }
+                  },
+                ),
+                if (_loadingLocation)
+                  Container(
+                    color: Colors.white.withOpacity(0.7),
+                    child: const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(color: _navy),
+                          SizedBox(height: 12),
+                          Text('Fetching your location...'),
+                        ],
+                      ),
+                    ),
+                  ),
                 // Filter chips
                 Positioned(
                   top: 12,
@@ -94,53 +208,14 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
                     ],
                   ),
                 ),
-                // Truck pins + owner location dot
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    return Stack(
-                      children: [
-                        // Owner's blue dot
-                        Positioned(
-                          left: constraints.maxWidth * 0.44 - 10,
-                          top: constraints.maxHeight * 0.44 - 10,
-                          child: Container(
-                            width: 20,
-                            height: 20,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(0xFF1565C0),
-                              boxShadow: [
-                                BoxShadow(color: Colors.black26, blurRadius: 6),
-                              ],
-                            ),
-                          ),
-                        ),
-                        for (int i = 0; i < _trucks.length; i++)
-                          Positioned(
-                            left: constraints.maxWidth * _trucks[i].dx - 22,
-                            top: constraints.maxHeight * _trucks[i].dy - 22,
-                            child: GestureDetector(
-                              onTap: () {
-                                ref.read(selectedTruckPinProvider.notifier).state = i;
-                                _showDriverSheet(context, _trucks[i]);
-                              },
-                              child: _TruckMarker(
-                                selected: selectedPin == i,
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
               ],
             ),
           ),
           // Bottom panel
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Colors.white,
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, -2)),
               ],
             ),
@@ -474,8 +549,8 @@ class _TruckPin {
   final String distance;
   final double rating;
   final int trips;
-  final double dx;
-  final double dy;
+  final double lat;
+  final double lng;
 
   const _TruckPin({
     required this.name,
@@ -485,8 +560,8 @@ class _TruckPin {
     required this.distance,
     required this.rating,
     required this.trips,
-    required this.dx,
-    required this.dy,
+    required this.lat,
+    required this.lng,
   });
 }
 
@@ -523,68 +598,3 @@ class _TypeChip extends StatelessWidget {
   }
 }
 
-class _TruckMarker extends StatelessWidget {
-  final bool selected;
-
-  const _TruckMarker({required this.selected});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: selected ? Colors.white : _navy,
-        border: selected ? Border.all(color: _navy, width: 2.5) : null,
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2))],
-      ),
-      child: Icon(
-        Icons.local_shipping,
-        size: 22,
-        color: selected ? _navy : Colors.white,
-      ),
-    );
-  }
-}
-
-// ─── Mock map painter ────────────────────────────────────────────────────────
-
-class _MapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = const Color(0xFFE8EDF2),
-    );
-    final block = Paint()..color = const Color(0xFFD6DCE4);
-    for (final r in [
-      Rect.fromLTWH(0, 0, size.width * 0.18, size.height * 0.26),
-      Rect.fromLTWH(size.width * 0.22, 0, size.width * 0.25, size.height * 0.26),
-      Rect.fromLTWH(size.width * 0.52, 0, size.width * 0.18, size.height * 0.26),
-      Rect.fromLTWH(size.width * 0.74, 0, size.width * 0.26, size.height * 0.26),
-      Rect.fromLTWH(0, size.height * 0.33, size.width * 0.18, size.height * 0.16),
-      Rect.fromLTWH(size.width * 0.52, size.height * 0.33, size.width * 0.18, size.height * 0.16),
-      Rect.fromLTWH(size.width * 0.74, size.height * 0.33, size.width * 0.26, size.height * 0.16),
-      Rect.fromLTWH(0, size.height * 0.56, size.width * 0.14, size.height * 0.22),
-      Rect.fromLTWH(size.width * 0.28, size.height * 0.56, size.width * 0.20, size.height * 0.22),
-      Rect.fromLTWH(size.width * 0.54, size.height * 0.56, size.width * 0.46, size.height * 0.22),
-      Rect.fromLTWH(0, size.height * 0.84, size.width * 0.35, size.height * 0.16),
-      Rect.fromLTWH(size.width * 0.40, size.height * 0.84, size.width * 0.60, size.height * 0.16),
-    ]) {
-      canvas.drawRect(r, block);
-    }
-    final road = Paint()..color = Colors.white..strokeWidth = 10..style = PaintingStyle.stroke;
-    final minor = Paint()..color = Colors.white..strokeWidth = 5..style = PaintingStyle.stroke;
-    canvas.drawLine(Offset(0, size.height * 0.285), Offset(size.width, size.height * 0.285), road);
-    canvas.drawLine(Offset(0, size.height * 0.525), Offset(size.width, size.height * 0.525), road);
-    canvas.drawLine(Offset(0, size.height * 0.80), Offset(size.width, size.height * 0.80), minor);
-    canvas.drawLine(Offset(size.width * 0.19, 0), Offset(size.width * 0.19, size.height), road);
-    canvas.drawLine(Offset(size.width * 0.49, 0), Offset(size.width * 0.49, size.height), road);
-    canvas.drawLine(Offset(size.width * 0.73, 0), Offset(size.width * 0.73, size.height), minor);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 const _navy = Color(0xFF003F7D);
 
@@ -10,23 +12,113 @@ class DriverMapScreen extends StatefulWidget {
 }
 
 class _DriverMapScreenState extends State<DriverMapScreen> {
+  GoogleMapController? _mapController;
+  LatLng? _currentPosition;
+  bool _loadingLocation = true;
   int _selectedIndex = 0;
+  Set<Marker> _markers = {};
 
+  // Hardcoded load data (will come from Supabase in Phase 6)
   static const _loads = [
     _LoadInfo(company: 'Rajesh Textiles', distance: '2.4 km', type: 'LCV · 800kg'),
     _LoadInfo(company: 'Mehta Traders', distance: '4.1 km', type: 'Mini · 400kg'),
     _LoadInfo(company: 'Singh Logistics', distance: '6.2 km', type: 'HCV · 2000kg'),
   ];
 
-  // Normalized positions on the mock map (dx, dy) 0.0–1.0
-  static const _pinPositions = [
-    Offset(0.62, 0.32),
-    Offset(0.22, 0.54),
-    Offset(0.72, 0.67),
+  // Offsets from driver's current position (lat, lng)
+  static const _pinOffsets = [
+    Offset(0.018, -0.021),
+    Offset(-0.016, 0.028),
+    Offset(0.012, 0.035),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() => _loadingLocation = false);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() => _loadingLocation = false);
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() => _loadingLocation = false);
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+
+      final current = LatLng(position.latitude, position.longitude);
+
+      setState(() {
+        _currentPosition = current;
+        _loadingLocation = false;
+        _markers = _buildMarkers(current);
+      });
+
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(current, 14),
+      );
+    } catch (e) {
+      setState(() => _loadingLocation = false);
+    }
+  }
+
+  Set<Marker> _buildMarkers(LatLng center) {
+    return Set.from(
+      List.generate(_loads.length, (i) {
+        return Marker(
+          markerId: MarkerId('load_$i'),
+          position: LatLng(
+            center.latitude + _pinOffsets[i].dx,
+            center.longitude + _pinOffsets[i].dy,
+          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            i == _selectedIndex
+                ? BitmapDescriptor.hueAzure
+                : BitmapDescriptor.hueRed,
+          ),
+          infoWindow: InfoWindow(
+            title: _loads[i].company,
+            snippet: '${_loads[i].distance} · ${_loads[i].type}',
+          ),
+          onTap: () => setState(() {
+            _selectedIndex = i;
+            _markers = _buildMarkers(center);
+          }),
+        );
+      }),
+    );
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Fallback center (Mumbai) if GPS unavailable
+    final mapCenter = _currentPosition ?? const LatLng(19.0760, 72.8777);
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -48,68 +140,57 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
       ),
       body: Column(
         children: [
+          // ── Map ────────────────────────────────────────────────────────
           Expanded(
             child: Stack(
               children: [
-                // Mock map background
-                SizedBox.expand(
-                  child: CustomPaint(painter: _MockMapPainter()),
-                ),
-                // Filter chips
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: Row(
-                    children: const [
-                      _FilterChip(label: '8 Loads'),
-                      SizedBox(width: 8),
-                      _FilterChip(label: '≤ 5 km'),
-                    ],
-                  ),
-                ),
-                // Pins and driver dot
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    return Stack(
-                      children: [
-                        // Driver's location (green dot)
-                        Positioned(
-                          left: constraints.maxWidth * 0.45 - 10,
-                          top: constraints.maxHeight * 0.47 - 10,
-                          child: Container(
-                            width: 20,
-                            height: 20,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(0xFF2ECC71),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 6,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
+                _loadingLocation
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(color: _navy),
+                            SizedBox(height: 16),
+                            Text(
+                              'Getting your location...',
+                              style: TextStyle(color: Colors.black54),
                             ),
-                          ),
+                          ],
                         ),
-                        // Load pins
-                        for (int i = 0; i < _pinPositions.length; i++)
-                          Positioned(
-                            left: constraints.maxWidth * _pinPositions[i].dx - 20,
-                            top: constraints.maxHeight * _pinPositions[i].dy - 20,
-                            child: GestureDetector(
-                              onTap: () => setState(() => _selectedIndex = i),
-                              child: _LoadPin(selected: _selectedIndex == i),
-                            ),
-                          ),
+                      )
+                    : GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: mapCenter,
+                          zoom: 14,
+                        ),
+                        onMapCreated: (controller) {
+                          _mapController = controller;
+                        },
+                        markers: _markers,
+                        myLocationEnabled: true,
+                        myLocationButtonEnabled: true,
+                        zoomControlsEnabled: false,
+                        mapToolbarEnabled: false,
+                      ),
+
+                // Filter chips
+                if (!_loadingLocation)
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Row(
+                      children: [
+                        _FilterChip(label: '${_loads.length} Loads'),
+                        const SizedBox(width: 8),
+                        const _FilterChip(label: '≤ 5 km'),
                       ],
-                    );
-                  },
-                ),
+                    ),
+                  ),
               ],
             ),
           ),
-          // Selected load card
+
+          // ── Selected load card ─────────────────────────────────────────
           _SelectedLoadCard(
             load: _loads[_selectedIndex],
             onView: () {},
@@ -119,6 +200,8 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     );
   }
 }
+
+// ── Data & Sub-widgets ────────────────────────────────────────────────────────
 
 class _LoadInfo {
   final String company;
@@ -134,7 +217,6 @@ class _LoadInfo {
 
 class _FilterChip extends StatelessWidget {
   final String label;
-
   const _FilterChip({required this.label});
 
   @override
@@ -160,34 +242,6 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class _LoadPin extends StatelessWidget {
-  final bool selected;
-
-  const _LoadPin({required this.selected});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: selected ? Colors.white : _navy,
-        border: selected ? Border.all(color: _navy, width: 2.5) : null,
-        boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
-        ],
-      ),
-      child: Icon(
-        Icons.inventory_2_outlined,
-        size: 20,
-        color: selected ? _navy : Colors.white,
-      ),
-    );
-  }
-}
-
 class _SelectedLoadCard extends StatelessWidget {
   final _LoadInfo load;
   final VoidCallback onView;
@@ -198,15 +252,11 @@ class _SelectedLoadCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 10,
-            offset: Offset(0, -3),
-          ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        boxShadow: [
+          BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -3)),
         ],
       ),
       child: Row(
@@ -247,49 +297,4 @@ class _SelectedLoadCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _MockMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bg = Paint()..color = const Color(0xFFE8EDF2);
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bg);
-
-    final blockPaint = Paint()..color = const Color(0xFFD6DCE4);
-    final blocks = [
-      Rect.fromLTWH(0, 0, size.width * 0.18, size.height * 0.25),
-      Rect.fromLTWH(size.width * 0.22, 0, size.width * 0.24, size.height * 0.25),
-      Rect.fromLTWH(size.width * 0.5, 0, size.width * 0.18, size.height * 0.25),
-      Rect.fromLTWH(0, size.height * 0.32, size.width * 0.18, size.height * 0.18),
-      Rect.fromLTWH(size.width * 0.54, size.height * 0.32, size.width * 0.14, size.height * 0.18),
-      Rect.fromLTWH(size.width * 0.72, size.height * 0.32, size.width * 0.28, size.height * 0.18),
-      Rect.fromLTWH(0, size.height * 0.56, size.width * 0.14, size.height * 0.22),
-      Rect.fromLTWH(size.width * 0.28, size.height * 0.56, size.width * 0.2, size.height * 0.22),
-      Rect.fromLTWH(size.width * 0.54, size.height * 0.56, size.width * 0.46, size.height * 0.22),
-      Rect.fromLTWH(0, size.height * 0.84, size.width * 0.35, size.height * 0.16),
-      Rect.fromLTWH(size.width * 0.4, size.height * 0.84, size.width * 0.6, size.height * 0.16),
-    ];
-    for (final block in blocks) {
-      canvas.drawRect(block, blockPaint);
-    }
-
-    final roadPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 10
-      ..style = PaintingStyle.stroke;
-    final minorPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 5
-      ..style = PaintingStyle.stroke;
-
-    canvas.drawLine(Offset(0, size.height * 0.285), Offset(size.width, size.height * 0.285), roadPaint);
-    canvas.drawLine(Offset(0, size.height * 0.525), Offset(size.width, size.height * 0.525), roadPaint);
-    canvas.drawLine(Offset(0, size.height * 0.80), Offset(size.width, size.height * 0.80), minorPaint);
-    canvas.drawLine(Offset(size.width * 0.19, 0), Offset(size.width * 0.19, size.height), roadPaint);
-    canvas.drawLine(Offset(size.width * 0.49, 0), Offset(size.width * 0.49, size.height), roadPaint);
-    canvas.drawLine(Offset(size.width * 0.71, 0), Offset(size.width * 0.71, size.height), minorPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -1,4 +1,4 @@
-package com.example.load_vehicle_connect
+package com.tripjio.app
 
 import io.flutter.embedding.android.FlutterActivity
 

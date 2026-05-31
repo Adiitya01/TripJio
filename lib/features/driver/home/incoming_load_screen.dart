@@ -143,9 +143,9 @@ class _IncomingLoadScreenState extends State<IncomingLoadScreen> {
                                     color: Colors.black54, size: 26),
                               ),
                               const SizedBox(width: 12),
-                              Column(
+                              const Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: const [
+                                children: [
                                   Text(
                                     'Rajesh Sharma',
                                     style: TextStyle(
@@ -165,13 +165,13 @@ class _IncomingLoadScreenState extends State<IncomingLoadScreen> {
                             ],
                           ),
                           const SizedBox(height: 18),
-                          _DotRow(
+                          const _DotRow(
                             label: 'PICKUP',
                             value: 'Andheri East, Mumbai',
                             dotColor: _navy,
                           ),
                           const SizedBox(height: 18),
-                          Row(
+                          const Row(
                             children: [
                               Expanded(
                                 child: _LabelValue(

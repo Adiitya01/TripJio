@@ -90,7 +90,7 @@ class RequestAcceptedScreen extends StatelessWidget {
                         Container(
                           width: 48,
                           height: 48,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             color: _navyLight,
                           ),

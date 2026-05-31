@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/services/auth_service.dart';
 import 'user_type_screen.dart';
 import 'otp_screen.dart';
 
@@ -15,13 +16,50 @@ class PhoneEntryScreen extends StatefulWidget {
 class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
   final _phoneController = TextEditingController();
   bool _agreed = false;
+  bool _isLoading = false;
 
-  bool get _canSend => _phoneController.text.length == 10 && _agreed;
+  bool get _canSend =>
+      _phoneController.text.length == 10 && _agreed && !_isLoading;
 
   @override
   void dispose() {
     _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _sendOtp() async {
+    setState(() => _isLoading = true);
+
+    final phone = '+91${_phoneController.text.trim()}';
+
+    await AuthService().verifyPhoneNumber(
+      phoneNumber: phone,
+      onCodeSent: (verificationId, resendToken) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => OtpScreen(
+              phone: '+91 ${_phoneController.text.trim()}',
+              userType: widget.userType,
+              verificationId: verificationId,
+              resendToken: resendToken,
+            ),
+          ),
+        );
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -62,8 +100,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 15),
                     decoration: BoxDecoration(
-                      border:
-                          Border.all(color: const Color(0xFF003F7D)),
+                      border: Border.all(color: const Color(0xFF003F7D)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Row(
@@ -95,8 +132,8 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                             const TextStyle(color: Colors.black38),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                              color: Color(0xFF003F7D)),
+                          borderSide:
+                              const BorderSide(color: Color(0xFF003F7D)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -154,16 +191,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _canSend
-                      ? () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => OtpScreen(
-                                phone: '+91 ${_phoneController.text}',
-                                userType: widget.userType,
-                              ),
-                            ),
-                          )
-                      : null,
+                  onPressed: _canSend ? _sendOtp : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF003F7D),
                     disabledBackgroundColor: Colors.grey.shade300,
@@ -173,11 +201,20 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Send OTP',
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w600),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          'Send OTP',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w600),
+                        ),
                 ),
               ),
               const SizedBox(height: 28),

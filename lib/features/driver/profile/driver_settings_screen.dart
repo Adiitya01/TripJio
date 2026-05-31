@@ -52,11 +52,11 @@ class DriverSettingsScreen extends StatelessWidget {
                         color: Colors.black54, size: 36),
                   ),
                   const SizedBox(width: 14),
-                  Expanded(
+                  const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Suresh Patil',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
@@ -64,14 +64,14 @@ class DriverSettingsScreen extends StatelessWidget {
                             color: Colors.black87,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        const Text(
+                        SizedBox(height: 2),
+                        Text(
                           '+91 98765 43210',
                           style: TextStyle(fontSize: 13, color: Colors.black54),
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: 6),
                         Row(
-                          children: const [
+                          children: [
                             Icon(Icons.star, size: 16, color: Colors.amber),
                             SizedBox(width: 4),
                             Text(

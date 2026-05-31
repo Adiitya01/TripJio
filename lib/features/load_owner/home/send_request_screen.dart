@@ -178,9 +178,9 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
                     maxLines: 3,
                     decoration: _inputDeco(
                       hint: 'Fragile items, handle with care',
-                      prefixIcon: Padding(
-                        padding: const EdgeInsets.only(bottom: 30),
-                        child: const Icon(Icons.note_alt_outlined, color: _navy, size: 20),
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.only(bottom: 30),
+                        child: Icon(Icons.note_alt_outlined, color: _navy, size: 20),
                       ),
                     ),
                   ),

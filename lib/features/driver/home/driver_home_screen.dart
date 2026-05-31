@@ -241,8 +241,8 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: const [
+    return const Row(
+      children: [
         _StatCard(label: 'Trips', value: '3'),
         SizedBox(width: 10),
         _StatCard(label: 'Hours', value: '4.5'),
@@ -323,7 +323,7 @@ class _NearbyLoadsSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        _TappableLoadCard(
+        const _TappableLoadCard(
           company: 'Rajesh Textiles',
           location: 'Andheri · 2.4 km',
           vehicleType: 'LCV · 800kg',
@@ -331,7 +331,7 @@ class _NearbyLoadsSection extends StatelessWidget {
           isNew: true,
         ),
         const SizedBox(height: 10),
-        _TappableLoadCard(
+        const _TappableLoadCard(
           company: 'Mehta Traders',
           location: 'Bandra · 4.1 km',
           vehicleType: 'Mini · 400kg',

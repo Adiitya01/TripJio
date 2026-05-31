@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'vehicle_details_screen.dart';
 
 class DriverProfileScreen extends StatefulWidget {
@@ -127,7 +127,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                     _label('YEARS OF EXPERIENCE'),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
-                      value: _selectedExperience,
+                      initialValue: _selectedExperience,
                       hint: const Text('Select experience',
                           style: TextStyle(color: Colors.black38)),
                       decoration: InputDecoration(

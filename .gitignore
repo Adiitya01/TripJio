@@ -11,7 +11,7 @@ build/
 .gradle/
 local.properties
 **/android/**/generated/
-**/android/app/src/main/res/values/google-services.json
+**/android/app/google-services.json
 
 # iOS
 **/ios/Flutter/Generated.xcconfig
@@ -31,3 +31,9 @@ Pods/
 *.ipr
 *.iws
 .DS_Store
+
+# Claude Code
+.claude/
+
+# Temp files
+*.tmp.*

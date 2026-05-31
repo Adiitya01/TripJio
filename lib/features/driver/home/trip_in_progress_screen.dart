@@ -37,9 +37,9 @@ class TripInProgressScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: Column(
+                    child: const Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Text(
                           'DISTANCE TO PICKUP',
                           style: TextStyle(
