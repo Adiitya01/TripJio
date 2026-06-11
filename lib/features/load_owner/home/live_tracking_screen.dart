@@ -1,68 +1,113 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../providers/load_owner_provider.dart';
 import 'driver_arrived_screen.dart';
 
-class LiveTrackingScreen extends StatefulWidget {
+class LiveTrackingScreen extends ConsumerStatefulWidget {
   final dynamic driver;
+  final String driverId;
+  final LatLng pickupLocation;
+  final String requestId;
 
-  const LiveTrackingScreen({super.key, required this.driver});
+  const LiveTrackingScreen({
+    super.key,
+    required this.driver,
+    required this.driverId,
+    required this.pickupLocation,
+    required this.requestId,
+  });
 
   @override
-  State<LiveTrackingScreen> createState() => _LiveTrackingScreenState();
+  ConsumerState<LiveTrackingScreen> createState() => _LiveTrackingScreenState();
 }
 
-class _LiveTrackingScreenState extends State<LiveTrackingScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _mapAnimationController;
-  late Animation<double> _movementAnimation;
-
+class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
   static const Color _navy = Color(0xFF003F7D);
   static const Color _navyLight = Color(0xFFE6EEF8);
 
-  double _distanceLeft = 1.2;
-  int _minutesLeft = 8;
+  GoogleMapController? _mapController;
+  LatLng? _driverPosition;
+  Set<Marker> _markers = {};
 
   @override
   void initState() {
     super.initState();
-    _mapAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 8),
-    );
-
-    _movementAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _mapAnimationController, curve: Curves.linear),
-    )..addListener(() {
-        setState(() {
-          _distanceLeft = (1.2 * (1.0 - _movementAnimation.value)).clamp(0.0, 1.2);
-          _minutesLeft = (8 * (1.0 - _movementAnimation.value)).ceil().clamp(0, 8);
-        });
-      });
-
-    _mapAnimationController.forward();
-
-    _mapAnimationController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => DriverArrivedScreen(driver: widget.driver),
-          ),
-        );
-      }
+    // Set the driver we're tracking
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(trackedDriverIdProvider.notifier).state = widget.driverId;
     });
+  }
+
+  void _updateDriverMarker(LatLng position) {
+    setState(() {
+      _driverPosition = position;
+      _markers = {
+        Marker(
+          markerId: const MarkerId('driver'),
+          position: position,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueAzure),
+          infoWindow: InfoWindow(
+            title: widget.driver.name ?? 'Driver',
+            snippet: widget.driver.vehicle ?? '',
+          ),
+        ),
+        Marker(
+          markerId: const MarkerId('pickup'),
+          position: widget.pickupLocation,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueGreen),
+          infoWindow: const InfoWindow(title: 'Your Location'),
+        ),
+      };
+    });
+    // Animate camera to follow driver
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLng(position),
+    );
   }
 
   @override
   void dispose() {
-    _mapAnimationController.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final String driverName = widget.driver.name ?? 'Suresh Patil';
-    final String vehicleInfo = widget.driver.vehicle ?? 'Mini Truck';
-    final String vehicleNumber = widget.driver.number ?? 'MH 14 AB 1234';
+    // Listen to Supabase Realtime updates
+    final locationStream =
+        ref.watch(driverRealtimeLocationProvider(widget.driverId));
+
+    locationStream.whenData((data) {
+      final lat = (data['latitude'] as num?)?.toDouble();
+      final lng = (data['longitude'] as num?)?.toDouble();
+      if (lat != null && lng != null) {
+        final newPos = LatLng(lat, lng);
+        _updateDriverMarker(newPos);
+
+        // Check if driver has arrived (within 100m of pickup)
+        if (_driverPosition != null) {
+          final distance = _distanceInMeters(newPos, widget.pickupLocation);
+          if (distance < 100) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    DriverArrivedScreen(driver: widget.driver),
+              ),
+            );
+          }
+        }
+      }
+    });
+
+    final String driverName = widget.driver.name ?? 'Driver';
+    final String vehicleInfo = widget.driver.vehicle ?? '';
+    final String vehicleNumber = widget.driver.number ?? '';
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -85,26 +130,30 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
       ),
       body: Stack(
         children: [
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _movementAnimation,
-              builder: (context, child) {
-                return CustomPaint(
-                  painter: _TrackingMapPainter(
-                    progress: _movementAnimation.value,
-                    navyColor: _navy,
-                  ),
-                );
-              },
+          // Real Google Map
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: widget.pickupLocation,
+              zoom: 15,
             ),
+            markers: _markers,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            onMapCreated: (controller) {
+              _mapController = controller;
+            },
           ),
-          
+
+          // Top status banner
           Positioned(
             top: 16,
             left: 20,
             right: 20,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(30),
@@ -118,37 +167,46 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF2ECC71),
-                      shape: BoxShape.circle,
+                  locationStream.when(
+                    data: (_) => const _PulseDot(),
+                    loading: () => const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: _navy),
                     ),
+                    error: (_, __) => const Icon(Icons.error_outline,
+                        size: 16, color: Colors.red),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
-                    'Driver on the way',
-                    style: TextStyle(
+                  Text(
+                    locationStream.when(
+                      data: (_) => 'Driver on the way',
+                      loading: () => 'Connecting...',
+                      error: (_, __) => 'Connection lost',
+                    ),
+                    style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                       color: Colors.black87,
                     ),
                   ),
                   const Spacer(),
-                  Text(
-                    '$_minutesLeft min',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: _navy,
+                  if (_driverPosition != null)
+                    Text(
+                      '${(_distanceInMeters(_driverPosition!, widget.pickupLocation) / 1000).toStringAsFixed(1)} km',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: _navy,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
           ),
-          
+
+          // Bottom driver info card
           Positioned(
             bottom: 0,
             left: 0,
@@ -157,7 +215,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(20)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black12,
@@ -168,87 +227,62 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
               ),
               child: SafeArea(
                 top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                child: Row(
                   children: [
                     Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: _navyLight.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(10),
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _navyLight,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child:
+                          const Icon(Icons.person, color: _navy, size: 28),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Driver is',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black54,
+                          Text(
+                            driverName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.black87,
                             ),
                           ),
+                          const SizedBox(height: 4),
                           Text(
-                            '${_distanceLeft.toStringAsFixed(1)} km away',
+                            '$vehicleInfo · $vehicleNumber',
                             style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: _navy,
+                              fontSize: 13,
+                              color: Colors.black54,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _navyLight,
-                          ),
-                          child: const Icon(Icons.person, color: _navy, size: 28),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                driverName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '$vehicleInfo · $vehicleNumber',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Color(0xFFE8F5E9),
-                          ),
-                          child: IconButton(
-                            icon: const Icon(Icons.phone, color: Color(0xFF2ECC71), size: 20),
-                            onPressed: () {},
-                          ),
-                        ),
-                      ],
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFFE8F5E9),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.phone,
+                            color: Color(0xFF2ECC71), size: 20),
+                        onPressed: () async {
+                          final phone = widget.driver.phone ?? '';
+                          if (phone.isEmpty) return;
+                          final uri = Uri.parse('tel:$phone');
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri);
+                          }
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -259,120 +293,67 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
       ),
     );
   }
+
+  double _distanceInMeters(LatLng a, LatLng b) {
+    const double earthRadius = 6371000;
+    final double dLat = _deg2rad(b.latitude - a.latitude);
+    final double dLng = _deg2rad(b.longitude - a.longitude);
+    final double sinHalfDlat = math.sin(dLat / 2);
+    final double sinHalfDlng = math.sin(dLng / 2);
+    final double x = sinHalfDlat * sinHalfDlat +
+        math.cos(_deg2rad(a.latitude)) *
+            math.cos(_deg2rad(b.latitude)) *
+            sinHalfDlng *
+            sinHalfDlng;
+    final double c = 2 * math.atan2(math.sqrt(x), math.sqrt(1 - x));
+    return earthRadius * c;
+  }
+
+  double _deg2rad(double deg) => deg * (math.pi / 180.0);
 }
 
-class _TrackingMapPainter extends CustomPainter {
-  final double progress;
-  final Color navyColor;
-
-  _TrackingMapPainter({required this.progress, required this.navyColor});
+// Pulsing green dot widget
+class _PulseDot extends StatefulWidget {
+  const _PulseDot();
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final bg = Paint()..color = const Color(0xFFE8EDF2);
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bg);
+  State<_PulseDot> createState() => _PulseDotState();
+}
 
-    final blockPaint = Paint()..color = const Color(0xFFD6DCE4);
-    final blocks = [
-      Rect.fromLTWH(20, 80, size.width * 0.4, size.height * 0.2),
-      Rect.fromLTWH(size.width * 0.52, 80, size.width * 0.4, size.height * 0.2),
-      Rect.fromLTWH(20, size.height * 0.35, size.width * 0.4, size.height * 0.25),
-      Rect.fromLTWH(size.width * 0.52, size.height * 0.35, size.width * 0.4, size.height * 0.25),
-    ];
-    for (final block in blocks) {
-      canvas.drawRect(block, blockPaint);
-    }
+class _PulseDotState extends State<_PulseDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
 
-    final roadPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 18
-      ..style = PaintingStyle.stroke;
-    
-    final roadBorderPaint = Paint()
-      ..color = Colors.grey.shade300
-      ..strokeWidth = 22
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-    final double startX = size.width * 0.25;
-    final double startY = size.height * 0.70;
-    final double midY = size.height * 0.32;
-    final double endX = size.width * 0.75;
-    final double endY = size.height * 0.32;
-
-    path.moveTo(startX, startY);
-    path.lineTo(startX, midY);
-    path.lineTo(endX, endY);
-
-    canvas.drawPath(path, roadBorderPaint);
-    canvas.drawPath(path, roadPaint);
-
-    final pinPaint = Paint()
-      ..color = navyColor
-      ..style = PaintingStyle.fill;
-    
-    canvas.drawCircle(Offset(endX, endY), 16, pinPaint);
-    canvas.drawCircle(
-      Offset(endX, endY),
-      12,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.fill,
-    );
-    canvas.drawCircle(
-      Offset(endX, endY),
-      6,
-      Paint()
-        ..color = navyColor
-        ..style = PaintingStyle.fill,
-    );
-
-    final double vLen = (startY - midY).abs();
-    final double hLen = (endX - startX).abs();
-    final double totalLen = vLen + hLen;
-    final double currentLen = progress * totalLen;
-
-    double truckX = startX;
-    double truckY = startY;
-
-    if (currentLen <= vLen) {
-      truckY = startY - currentLen;
-    } else {
-      truckY = midY;
-      truckX = startX + (currentLen - vLen);
-    }
-
-    canvas.drawCircle(
-      Offset(truckX, truckY),
-      20,
-      Paint()
-        ..color = navyColor.withOpacity(0.2)
-        ..style = PaintingStyle.fill,
-    );
-    
-    canvas.drawCircle(Offset(truckX, truckY), 15, pinPaint);
-
-    const textStyle = TextStyle(
-      color: Colors.white,
-      fontFamily: 'MaterialIcons',
-      fontSize: 16,
-    );
-    final textPainter = TextPainter(
-      text: const TextSpan(
-        text: '\ue395', // Use direct unicode escape string for Icon instead of fromCharCode
-        style: textStyle,
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    textPainter.layout();
-    textPainter.paint(
-      canvas,
-      Offset(truckX - 8, truckY - 8),
-    );
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0.6, end: 1.0).animate(_ctrl);
   }
 
   @override
-  bool shouldRepaint(covariant _TrackingMapPainter oldDelegate) {
-    return oldDelegate.progress != progress;
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, __) => Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color:
+              Color.fromRGBO(46, 204, 113, _anim.value),
+        ),
+      ),
+    );
   }
 }

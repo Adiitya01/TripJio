@@ -1,12 +1,107 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/services/distance_service.dart';
+import '../../../data/repositories/request_repository.dart';
+import '../../../data/repositories/trip_repository.dart';
+import '../../../data/models/request_model.dart';
+import '../../../data/models/trip_model.dart';
 import 'trip_in_progress_screen.dart';
 
 const _navy = Color(0xFF003F7D);
 const _navyLight = Color(0xFFE6EEF8);
 const _green = Color(0xFF1A7A4A);
 
-class TripAcceptedScreen extends StatelessWidget {
-  const TripAcceptedScreen({super.key});
+class TripAcceptedScreen extends ConsumerStatefulWidget {
+  final RequestModel request;
+  final String loadOwnerName;
+  final String tripId; // Pre-created by accept_request_and_create_trip RPC
+
+  const TripAcceptedScreen({
+    super.key,
+    required this.request,
+    required this.loadOwnerName,
+    required this.tripId,
+  });
+
+  @override
+  ConsumerState<TripAcceptedScreen> createState() =>
+      _TripAcceptedScreenState();
+}
+
+class _TripAcceptedScreenState extends ConsumerState<TripAcceptedScreen> {
+  bool _isStarting = false;
+
+  String get _distanceLabel => DistanceService.distanceLabel(
+        widget.request.pickupLat,
+        widget.request.pickupLng,
+        widget.request.dropLat,
+        widget.request.dropLng,
+      );
+
+  String get _fareLabel => DistanceService.fareLabel(
+        distanceKm: DistanceService.distanceInKm(
+          widget.request.pickupLat,
+          widget.request.pickupLng,
+          widget.request.dropLat,
+          widget.request.dropLng,
+        ),
+        vehicleType: 'Mini Truck',
+        weightKg: widget.request.weightKg ?? 0,
+      );
+
+  Future<void> _startTrip() async {
+    setState(() => _isStarting = true);
+    try {
+      // Trip was already created atomically when accepting — just fetch and
+      // mark it as in_progress.
+      await TripRepository()
+          .updateStatus(widget.tripId, 'in_progress');
+
+      // Build a local TripModel from the request data we already have
+      final trip = TripModel(
+        id: widget.tripId,
+        loadOwnerId: widget.request.loadOwnerId,
+        driverId: widget.request.driverId,
+        pickupAddress: widget.request.pickupAddress,
+        dropAddress: widget.request.dropAddress,
+        pickupLat: widget.request.pickupLat,
+        pickupLng: widget.request.pickupLng,
+        dropLat: widget.request.dropLat,
+        dropLng: widget.request.dropLng,
+        status: 'in_progress',
+        distanceKm: null,
+        goodsDescription: widget.request.goodsDescription,
+        weightKg: widget.request.weightKg,
+        createdAt: DateTime.now(),
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => TripInProgressScreen(trip: trip),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to start trip: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isStarting = false);
+    }
+  }
+
+  Future<void> _cancelTrip() async {
+    await RequestRepository().respondToRequest(
+      requestId: widget.request.id,
+      accepted: false,
+    );
+    if (mounted) Navigator.of(context).pop();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +113,8 @@ class TripAcceptedScreen extends StatelessWidget {
             // Green confirmed banner
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 20, vertical: 18),
               color: _green,
               child: Row(
                 children: [
@@ -29,25 +125,22 @@ class TripAcceptedScreen extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: Colors.white.withValues(alpha: 0.2),
                     ),
-                    child: const Icon(Icons.check, color: Colors.white, size: 26),
+                    child: const Icon(Icons.check,
+                        color: Colors.white, size: 26),
                   ),
                   const SizedBox(width: 14),
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Trip Confirmed',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
+                      Text('Trip Confirmed',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18)),
                       SizedBox(height: 2),
-                      Text(
-                        'Head to pickup location',
-                        style: TextStyle(color: Colors.white70, fontSize: 13),
-                      ),
+                      Text('Head to pickup location',
+                          style: TextStyle(
+                              color: Colors.white70, fontSize: 13)),
                     ],
                   ),
                 ],
@@ -65,7 +158,8 @@ class TripAcceptedScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200),
+                        border:
+                            Border.all(color: Colors.grey.shade200),
                       ),
                       child: Row(
                         children: [
@@ -80,39 +174,37 @@ class TripAcceptedScreen extends StatelessWidget {
                                 color: Colors.black54, size: 28),
                           ),
                           const SizedBox(width: 12),
-                          const Expanded(
+                          Expanded(
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Rajesh Sharma',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                                SizedBox(height: 3),
-                                Text(
-                                  'Sharma Textiles · +91 98765 43210',
-                                  style: TextStyle(
-                                      fontSize: 12, color: Colors.black54),
-                                ),
+                                Text(widget.loadOwnerName,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Colors.black87)),
+                                const SizedBox(height: 3),
+                                const Text('Load Owner',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.black54)),
                               ],
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () {},
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _green,
-                              ),
-                              child: const Icon(Icons.phone,
-                                  color: Colors.white, size: 20),
+                          // Fare badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _navyLight,
+                              borderRadius: BorderRadius.circular(20),
                             ),
+                            child: Text(_fareLabel,
+                                style: const TextStyle(
+                                    color: _navy,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14)),
                           ),
                         ],
                       ),
@@ -124,108 +216,106 @@ class TripAcceptedScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200),
+                        border:
+                            Border.all(color: Colors.grey.shade200),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Pickup
                           Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.only(top: 4),
+                                padding:
+                                    const EdgeInsets.only(top: 4),
                                 child: Container(
                                   width: 10,
                                   height: 10,
                                   decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: _navy,
-                                  ),
+                                      shape: BoxShape.circle,
+                                      color: _navy),
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'PICKUP',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.black45,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    'Andheri East, Mumbai',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    '2.4 km away',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: _navy,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('PICKUP',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.black45,
+                                            fontWeight:
+                                                FontWeight.w600,
+                                            letterSpacing: 0.5)),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                        widget.request.pickupAddress,
+                                        style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight:
+                                                FontWeight.w600,
+                                            color: Colors.black87)),
+                                    const SizedBox(height: 2),
+                                    Text(_distanceLabel,
+                                        style: const TextStyle(
+                                            fontSize: 13,
+                                            color: _navy,
+                                            fontWeight:
+                                                FontWeight.w500)),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
-                          // Connector line
                           Padding(
-                            padding: const EdgeInsets.only(left: 4, top: 6, bottom: 6),
+                            padding: const EdgeInsets.only(
+                                left: 4, top: 6, bottom: 6),
                             child: Container(
-                              width: 2,
-                              height: 20,
-                              color: Colors.grey.shade300,
-                            ),
+                                width: 2,
+                                height: 20,
+                                color: Colors.grey.shade300),
                           ),
-                          // Drop
                           Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.only(top: 4),
+                                padding:
+                                    const EdgeInsets.only(top: 4),
                                 child: Container(
                                   width: 10,
                                   height: 10,
                                   decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Color(0xFF2ECC71),
-                                  ),
+                                      shape: BoxShape.circle,
+                                      color: Color(0xFF2ECC71)),
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'DROP',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.black45,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    'Bandra West, Mumbai',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                ],
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('DROP',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.black45,
+                                            fontWeight:
+                                                FontWeight.w600,
+                                            letterSpacing: 0.5)),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                        widget.request.dropAddress,
+                                        style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight:
+                                                FontWeight.w600,
+                                            color: Colors.black87)),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -233,61 +323,66 @@ class TripAcceptedScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    // Load details card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: _navyLight,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'LOAD DETAILS',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.black45,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
+                    // Load details
+                    if (widget.request.goodsDescription != null ||
+                        widget.request.weightKg != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: _navyLight,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('LOAD DETAILS',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.black45,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5)),
+                            const SizedBox(height: 6),
+                            Text(
+                              [
+                                if (widget.request.weightKg != null)
+                                  '${widget.request.weightKg!.round()} kg',
+                                if (widget.request.goodsDescription !=
+                                    null)
+                                  widget.request.goodsDescription!,
+                              ].join(' · '),
+                              style: const TextStyle(
+                                  fontSize: 14, color: Colors.black87),
                             ),
-                          ),
-                          SizedBox(height: 6),
-                          Text(
-                            '650 kg · Fragile items, handle with care',
-                            style: TextStyle(fontSize: 14, color: Colors.black87),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
             ),
-            // Buttons inside screen
             Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                border: Border(
+                    top: BorderSide(color: Colors.grey.shade200)),
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close, color: Colors.black87, size: 18),
-                      label: const Text(
-                        'Cancel',
-                        style: TextStyle(
-                          color: Colors.black87,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      onPressed: _cancelTrip,
+                      icon: const Icon(Icons.close,
+                          color: Colors.black87, size: 18),
+                      label: const Text('Cancel',
+                          style: TextStyle(
+                              color: Colors.black87,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600)),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 14),
                         side: BorderSide(color: Colors.grey.shade300),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(28)),
@@ -298,23 +393,26 @@ class TripAcceptedScreen extends StatelessWidget {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton.icon(
-                      onPressed: () => Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                            builder: (_) => const TripInProgressScreen()),
-                      ),
-                      icon: const Icon(Icons.navigation_outlined,
-                          color: Colors.white, size: 18),
-                      label: const Text(
-                        'Start Trip',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      onPressed: _isStarting ? null : _startTrip,
+                      icon: _isStarting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.navigation_outlined,
+                              color: Colors.white, size: 18),
+                      label: Text(
+                          _isStarting ? 'Starting...' : 'Start Trip',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _navy,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 14),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(28)),
                         elevation: 0,

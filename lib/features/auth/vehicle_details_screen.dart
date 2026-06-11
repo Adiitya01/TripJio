@@ -1,8 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+import '../../core/services/session_service.dart';
+import '../../core/utils/validators.dart';
+import '../../data/models/user_model.dart';
+import '../../data/models/vehicle_model.dart';
+import '../../data/repositories/user_repository.dart';
 import 'location_permission_screen.dart';
 
 class VehicleDetailsScreen extends StatefulWidget {
-  const VehicleDetailsScreen({super.key});
+  final String uid;
+  final String phone;
+  final String name;
+  final String licenseNumber;
+  final String experience;
+
+  const VehicleDetailsScreen({
+    super.key,
+    required this.uid,
+    required this.phone,
+    required this.name,
+    required this.licenseNumber,
+    required this.experience,
+  });
 
   @override
   State<VehicleDetailsScreen> createState() => _VehicleDetailsScreenState();
@@ -11,17 +31,96 @@ class VehicleDetailsScreen extends StatefulWidget {
 class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
   final _vehicleNumberController = TextEditingController();
   String? _selectedType;
+  bool _isSaving = false;
 
   static const _vehicleTypes = ['Mini Truck', 'LCV', 'HCV', 'Container'];
 
   bool get _canComplete =>
       _vehicleNumberController.text.trim().isNotEmpty &&
-      _selectedType != null;
+      _selectedType != null &&
+      !_isSaving;
 
   @override
   void dispose() {
     _vehicleNumberController.dispose();
     super.dispose();
+  }
+
+  Future<void> _completeSetup() async {
+    // Validate vehicle number
+    final vehicleErr =
+        Validators.vehicleNumber(_vehicleNumberController.text);
+    if (vehicleErr != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(vehicleErr),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final repo = UserRepository();
+
+      // 1. Save user profile
+      await repo.saveUser(UserModel(
+        id: widget.uid,
+        phone: widget.phone,
+        name: widget.name,
+        userType: 'driver',
+        createdAt: DateTime.now(),
+      ));
+
+      // 2. Save driver details
+      await repo.saveDriverDetails(
+        userId: widget.uid,
+        licenseNumber: widget.licenseNumber,
+        experience: widget.experience,
+      );
+
+      // 3. Save vehicle
+      await repo.saveVehicle(VehicleModel(
+        id: const Uuid().v4(),
+        userId: widget.uid,
+        vehicleNumber: _vehicleNumberController.text.trim().toUpperCase(),
+        vehicleType: _selectedType!,
+        createdAt: DateTime.now(),
+      ));
+
+      // 4. Persist login state locally (uid stored for background GPS isolate)
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('userType', 'driver');
+      await prefs.setString('uid', widget.uid);
+
+      // 5. Register this device as the active session (kicks out other devices)
+      await SessionService.registerSession(widget.uid);
+
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+            builder: (_) => const LocationPermissionScreen(isDriver: true)),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final raw = e.toString();
+      final friendly = raw.contains('idx_vehicles_unique_number')
+          ? 'This vehicle number is already registered'
+          : raw.contains('idx_drivers_unique_license')
+              ? 'This license number is already registered'
+              : 'Failed to save profile';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(friendly),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -55,11 +154,9 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                     const SizedBox(height: 4),
                     const Text(
                       'Step 2 of 2',
-                      style:
-                          TextStyle(fontSize: 15, color: Colors.black54),
+                      style: TextStyle(fontSize: 15, color: Colors.black54),
                     ),
                     const SizedBox(height: 24),
-                    // Vehicle photo upload area
                     GestureDetector(
                       onTap: () {},
                       child: Container(
@@ -71,17 +168,13 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                           border: Border.all(
                             color: const Color(0xFF003F7D),
                             width: 1.5,
-                            style: BorderStyle.solid,
                           ),
                         ),
                         child: const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.camera_alt_outlined,
-                              size: 36,
-                              color: Color(0xFF003F7D),
-                            ),
+                            Icon(Icons.camera_alt_outlined,
+                                size: 36, color: Color(0xFF003F7D)),
                             SizedBox(height: 8),
                             Text(
                               'Add Vehicle Photo',
@@ -104,8 +197,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
                         hintText: 'MH 14 AB 1234',
-                        hintStyle:
-                            const TextStyle(color: Colors.black38),
+                        hintStyle: const TextStyle(color: Colors.black38),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide:
@@ -118,8 +210,8 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                              color: Color(0xFF003F7D)),
+                          borderSide:
+                              const BorderSide(color: Color(0xFF003F7D)),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 14),
@@ -183,12 +275,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _canComplete
-                      ? () => Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) =>
-                                const LocationPermissionScreen(isDriver: true),
-                          ))
-                      : null,
+                  onPressed: _canComplete ? _completeSetup : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF003F7D),
                     disabledBackgroundColor: Colors.grey.shade300,
@@ -197,9 +284,16 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                         borderRadius: BorderRadius.circular(28)),
                     elevation: 0,
                   ),
-                  child: const Text('Complete Setup',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w600)),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : const Text('Complete Setup',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w600)),
                 ),
               ),
             ),

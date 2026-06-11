@@ -1,4 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/services/session_service.dart';
+import '../../data/models/user_model.dart';
+import '../../data/repositories/user_repository.dart';
 import 'location_permission_screen.dart';
 
 class LoadOwnerProfileScreen extends StatefulWidget {
@@ -13,6 +18,7 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
   final _nameController = TextEditingController();
   final _companyController = TextEditingController();
   String? _selectedCity;
+  bool _isSaving = false;
 
   static const _cities = [
     'Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad',
@@ -20,13 +26,62 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
     'Nagpur', 'Lucknow', 'Indore', 'Bhopal', 'Coimbatore',
   ];
 
-  bool get _canContinue => _nameController.text.trim().isNotEmpty;
+  bool get _canContinue =>
+      _nameController.text.trim().isNotEmpty && !_isSaving;
 
   @override
   void dispose() {
     _nameController.dispose();
     _companyController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveProfile() async {
+    setState(() => _isSaving = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final uid = user?.uid ?? '';
+      final phone = user?.phoneNumber ?? '';
+
+      await UserRepository().saveUser(UserModel(
+        id: uid,
+        phone: phone,
+        name: _nameController.text.trim(),
+        userType: 'load_owner',
+        companyName: _companyController.text.trim().isNotEmpty
+            ? _companyController.text.trim()
+            : null,
+        city: _selectedCity,
+        createdAt: DateTime.now(),
+      ));
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('userType', 'load_owner');
+      await prefs.setString('uid', uid);
+
+      // Register this device as the active session
+      await SessionService.registerSession(uid);
+
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+            builder: (_) =>
+                const LocationPermissionScreen(isDriver: false)),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save profile: $e'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -60,7 +115,8 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
                     const SizedBox(height: 4),
                     const Text(
                       'Tell us about yourself',
-                      style: TextStyle(fontSize: 15, color: Colors.black54),
+                      style:
+                          TextStyle(fontSize: 15, color: Colors.black54),
                     ),
                     const SizedBox(height: 28),
                     Center(
@@ -76,11 +132,8 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
                                 width: 2,
                               ),
                             ),
-                            child: const Icon(
-                              Icons.person,
-                              size: 54,
-                              color: Colors.black87,
-                            ),
+                            child: const Icon(Icons.person,
+                                size: 54, color: Colors.black87),
                           ),
                           Positioned(
                             bottom: 0,
@@ -94,11 +147,8 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
                                 border: Border.all(
                                     color: Colors.white, width: 2),
                               ),
-                              child: const Icon(
-                                Icons.camera_alt,
-                                size: 14,
-                                color: Colors.white,
-                              ),
+                              child: const Icon(Icons.camera_alt,
+                                  size: 14, color: Colors.white),
                             ),
                           ),
                         ],
@@ -146,10 +196,11 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
                             horizontal: 16, vertical: 14),
                       ),
                       items: _cities
-                          .map((c) =>
-                              DropdownMenuItem(value: c, child: Text(c)))
+                          .map((c) => DropdownMenuItem(
+                              value: c, child: Text(c)))
                           .toList(),
-                      onChanged: (v) => setState(() => _selectedCity = v),
+                      onChanged: (v) =>
+                          setState(() => _selectedCity = v),
                     ),
                     const SizedBox(height: 32),
                   ],
@@ -162,12 +213,7 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _canContinue
-                      ? () => Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) =>
-                                const LocationPermissionScreen(isDriver: false),
-                          ))
-                      : null,
+                  onPressed: _canContinue ? _saveProfile : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF003F7D),
                     disabledBackgroundColor: Colors.grey.shade300,
@@ -176,9 +222,17 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
                         borderRadius: BorderRadius.circular(28)),
                     elevation: 0,
                   ),
-                  child: const Text('Continue',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w600)),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : const Text('Continue',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600)),
                 ),
               ),
             ),

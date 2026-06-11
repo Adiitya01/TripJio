@@ -9,9 +9,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -24,6 +22,15 @@ class DefaultFirebaseOptions {
         );
     }
   }
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyBIxxo3zJD2G-XVHqq15S0ZldhiBoywu58',
+    appId: '1:936663940212:web:f2a394c01e4e408f172521',
+    messagingSenderId: '936663940212',
+    projectId: 'tripjio-dev',
+    storageBucket: 'tripjio-dev.firebasestorage.app',
+    authDomain: 'tripjio-dev.firebaseapp.com',
+  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBIxxo3zJD2G-XVHqq15S0ZldhiBoywu58',

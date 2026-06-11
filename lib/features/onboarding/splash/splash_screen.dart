@@ -6,6 +6,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import '../onboarding_screen.dart';
 import '../../driver/home/driver_home_screen.dart';
 import '../../load_owner/home/load_owner_home_screen.dart';
+import '../../../core/services/session_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -130,13 +131,26 @@ class _SplashScreenState extends State<SplashScreen>
     ]);
     final prefs = results[0] as SharedPreferences;
 
-    // Use Firebase Auth as the source of truth for login state
     final firebaseUser = FirebaseAuth.instance.currentUser;
-    final isLoggedIn = firebaseUser != null;
-
-    // User type (driver/loadOwner) is stored in SharedPreferences
-    // since Firebase Auth doesn't know about app-specific roles
+    var isLoggedIn = firebaseUser != null;
     final userType = prefs.getString('userType');
+
+    // Refresh Firebase token + verify this device is still the active session.
+    // If user signed in on another device → force log out here (1.2 + 1.8).
+    if (isLoggedIn && firebaseUser != null) {
+      await SessionService.refreshAuthToken();
+      try {
+        final stillValid =
+            await SessionService.isSessionValid(firebaseUser.uid);
+        if (!stillValid) {
+          await FirebaseAuth.instance.signOut();
+          await prefs.clear();
+          isLoggedIn = false;
+        }
+      } catch (_) {
+        // Network error — let user in; will re-check on next request
+      }
+    }
 
     return {
       'isLoggedIn': isLoggedIn,
@@ -290,7 +304,7 @@ class _SplitCirclePainter extends CustomPainter {
     if (opacity <= 0) return;
 
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.25 * opacity);
+      ..color = Colors.white.withValues(alpha: 0.25 * opacity);
 
     final center = Offset(size.width / 2, size.height / 2);
     const radius = 60.0;

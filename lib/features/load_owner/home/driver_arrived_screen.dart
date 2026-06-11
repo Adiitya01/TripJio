@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DriverArrivedScreen extends StatelessWidget {
   final dynamic driver;
@@ -10,9 +11,9 @@ class DriverArrivedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String driverName = driver.name ?? 'Suresh Patil';
-    final String vehicleInfo = driver.vehicle ?? 'Mini Truck';
-    final String vehicleNumber = driver.number ?? 'MH 14 AB 1234';
+    final String driverName = driver.name ?? 'Driver';
+    final String vehicleInfo = driver.vehicle ?? '';
+    final String vehicleNumber = driver.number ?? '';
 
     final String firstName = driverName.split(' ')[0];
 
@@ -135,7 +136,14 @@ class DriverArrivedScreen extends StatelessWidget {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () {},
+                        onPressed: () async {
+                          final phone = driver.phone ?? '';
+                          if (phone.isEmpty) return;
+                          final uri = Uri.parse('tel:$phone');
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri);
+                          }
+                        },
                         icon: const Icon(Icons.phone_outlined, size: 18, color: Colors.black87),
                         label: const Text(
                           'Call',

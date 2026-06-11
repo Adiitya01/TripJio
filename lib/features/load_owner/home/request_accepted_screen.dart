@@ -1,18 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'live_tracking_screen.dart';
 
 class RequestAcceptedScreen extends StatelessWidget {
   final dynamic driver;
+  final String driverId;
+  final LatLng pickupLocation;
+  final String requestId;
 
-  const RequestAcceptedScreen({super.key, required this.driver});
+  const RequestAcceptedScreen({
+    super.key,
+    required this.driver,
+    required this.driverId,
+    required this.pickupLocation,
+    required this.requestId,
+  });
 
   static const Color _navy = Color(0xFF003F7D);
   static const Color _navyLight = Color(0xFFE6EEF8);
 
   @override
   Widget build(BuildContext context) {
-    final String driverName = driver.name ?? 'Suresh Patil';
-    final String vehicleNumber = driver.number ?? 'MH 14 AB 1234';
+    final String driverName = driver.name ?? 'Driver';
+    final String vehicleNumber = driver.number ?? '';
 
     final String firstName = driverName.split(' ')[0];
 
@@ -174,7 +184,12 @@ class RequestAcceptedScreen extends StatelessWidget {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => LiveTrackingScreen(driver: driver),
+                          builder: (_) => LiveTrackingScreen(
+                            driver: driver,
+                            driverId: driverId,
+                            pickupLocation: pickupLocation,
+                            requestId: requestId,
+                          ),
                         ),
                       );
                     },

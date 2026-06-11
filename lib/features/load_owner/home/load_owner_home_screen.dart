@@ -4,10 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../providers/load_owner_provider.dart';
+import '../../../data/repositories/driver_repository.dart';
 import 'drivers_list_screen.dart';
 import 'send_request_screen.dart';
 
 const _navy = Color(0xFF003F7D);
+// ignore: unused_element
 const _navyLight = Color(0xFFE6EEF8);
 const _amber = Color(0xFFF59E0B);
 
@@ -26,23 +28,8 @@ class LoadOwnerHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
-  static const _truckData = [
-    (name: 'Suresh Patil', vehicle: 'Mini Truck', number: 'MH 14 AB 1234', capacity: '800 kg', distance: '2.4 km', rating: 4.8, trips: 234, dLat: 0.018, dLng: -0.021),
-    (name: 'Ramesh Kumar', vehicle: 'LCV', number: 'MH 12 CD 5678', capacity: '1200 kg', distance: '3.7 km', rating: 4.6, trips: 187, dLat: -0.016, dLng: -0.048),
-    (name: 'Anil Yadav', vehicle: 'HCV', number: 'MH 04 EF 9012', capacity: '2500 kg', distance: '5.1 km', rating: 4.9, trips: 312, dLat: -0.003, dLng: 0.005),
-  ];
-
-  List<_TruckPin> get _trucks => _truckData.map((t) => _TruckPin(
-    name: t.name,
-    vehicle: t.vehicle,
-    number: t.number,
-    capacity: t.capacity,
-    distance: t.distance,
-    rating: t.rating,
-    trips: t.trips,
-    lat: _mapCenter.latitude + t.dLat,
-    lng: _mapCenter.longitude + t.dLng,
-  )).toList();
+  // Real drivers fetched from Supabase — populated in build()
+  List<_TruckPin> _trucks = [];
 
   GoogleMapController? _mapController;
   LatLng _mapCenter = const LatLng(19.0760, 72.8777);
@@ -81,6 +68,9 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
       );
 
       final newCenter = LatLng(position.latitude, position.longitude);
+      // Push user location to provider so nearbyDriversProvider can query
+      ref.read(userLocationProvider.notifier).state =
+          (lat: position.latitude, lng: position.longitude);
       setState(() {
         _mapCenter = newCenter;
         _loadingLocation = false;
@@ -118,6 +108,34 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final selectedType = ref.watch(vehicleTypeFilterProvider);
+    final userLocation = ref.watch(userLocationProvider);
+
+    // Fetch real drivers from Supabase when location is available
+    final driversAsync = userLocation == null
+        ? const AsyncValue<List<NearbyDriver>>.loading()
+        : ref.watch(nearbyDriversProvider(userLocation));
+
+    // Convert real drivers to truck pins
+    _trucks = driversAsync.maybeWhen(
+      data: (drivers) => drivers
+          .map((d) => _TruckPin(
+                userId: d.userId,
+                name: d.name,
+                vehicle: d.vehicleType,
+                vehicleType: d.vehicleType,
+                number: d.vehicleNumber,
+                capacity: d.capacity,
+                distance: '${d.distanceKm.toStringAsFixed(1)} km',
+                distanceKm: d.distanceKm,
+                rating: d.rating,
+                trips: d.totalTrips,
+                lat: d.latitude,
+                lng: d.longitude,
+              ))
+          .toList(),
+      orElse: () => <_TruckPin>[],
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
@@ -175,7 +193,7 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
                 ),
                 if (_loadingLocation)
                   Container(
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                     child: const Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -201,7 +219,7 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
                       ),
                       const SizedBox(width: 8),
                       _TypeChip(
-                        label: '12 Online',
+                        label: '${_trucks.length} Online',
                         selected: true,
                         onTap: () {},
                       ),
@@ -228,7 +246,7 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '12 trucks nearby',
+                        '${_trucks.length} trucks nearby',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -254,26 +272,33 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 14),
-                        const Icon(Icons.search, color: Colors.black45, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Search pickup location',
-                          style: GoogleFonts.poppins(
-                            color: Colors.black45,
-                            fontSize: 14,
-                          ),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton.icon(
+                      onPressed: _trucks.isEmpty
+                          ? null
+                          : () => _findNearestDriver(context),
+                      icon: const Icon(Icons.local_shipping_rounded,
+                          color: Colors.white, size: 22),
+                      label: Text(
+                        _trucks.isEmpty
+                            ? 'No drivers available'
+                            : 'Find a Driver',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
                         ),
-                      ],
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _navy,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(27)),
+                      ),
                     ),
                   ),
                 ),
@@ -281,6 +306,38 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// "Uber-style" auto-find: picks the closest online driver and
+  /// opens the SendRequest screen with them pre-selected.
+  void _findNearestDriver(BuildContext context) {
+    if (_trucks.isEmpty) return;
+    // _trucks already sorted by distance ascending from nearbyDriversProvider
+    final nearest = _trucks.first;
+    ref.read(selectedTruckPinProvider.notifier).state = 0;
+
+    // Animate map to the chosen driver
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(LatLng(nearest.lat, nearest.lng), 15),
+    );
+
+    // Quick feedback then open SendRequest
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            'Closest driver: ${nearest.name} · ${nearest.distance} away'),
+        backgroundColor: _navy,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SendRequestScreen(driver: nearest),
       ),
     );
   }
@@ -542,22 +599,28 @@ class _StatCell extends StatelessWidget {
 // ─── Data model ─────────────────────────────────────────────────────────────
 
 class _TruckPin {
+  final String userId;
   final String name;
   final String vehicle;
+  final String vehicleType;
   final String number;
   final String capacity;
   final String distance;
+  final double distanceKm;
   final double rating;
   final int trips;
   final double lat;
   final double lng;
 
   const _TruckPin({
+    required this.userId,
     required this.name,
     required this.vehicle,
+    required this.vehicleType,
     required this.number,
     required this.capacity,
     required this.distance,
+    required this.distanceKm,
     required this.rating,
     required this.trips,
     required this.lat,

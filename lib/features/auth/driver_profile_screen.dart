@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'vehicle_details_screen.dart';
 
@@ -64,8 +65,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                     const SizedBox(height: 4),
                     const Text(
                       'Step 1 of 2',
-                      style:
-                          TextStyle(fontSize: 15, color: Colors.black54),
+                      style: TextStyle(fontSize: 15, color: Colors.black54),
                     ),
                     const SizedBox(height: 28),
                     Center(
@@ -96,8 +96,8 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                               decoration: BoxDecoration(
                                 color: const Color(0xFF003F7D),
                                 shape: BoxShape.circle,
-                                border: Border.all(
-                                    color: Colors.white, width: 2),
+                                border:
+                                    Border.all(color: Colors.white, width: 2),
                               ),
                               child: const Icon(Icons.camera_alt,
                                   size: 14, color: Colors.white),
@@ -143,8 +143,8 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                              color: Color(0xFF003F7D)),
+                          borderSide:
+                              const BorderSide(color: Color(0xFF003F7D)),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 14),
@@ -167,11 +167,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _canProceed
-                      ? () => Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => const VehicleDetailsScreen(),
-                          ))
-                      : null,
+                  onPressed: _canProceed ? _goNext : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF003F7D),
                     disabledBackgroundColor: Colors.grey.shade300,
@@ -190,6 +186,20 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         ),
       ),
     );
+  }
+
+  void _goNext() {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final phone = FirebaseAuth.instance.currentUser?.phoneNumber ?? '';
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => VehicleDetailsScreen(
+        uid: uid,
+        phone: phone,
+        name: _nameController.text.trim(),
+        licenseNumber: _licenseController.text.trim(),
+        experience: _selectedExperience!,
+      ),
+    ));
   }
 
   Widget _label(String text) => Text(

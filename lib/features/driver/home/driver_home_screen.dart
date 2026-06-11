@@ -1,10 +1,49 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../providers/driver_provider.dart';
 import 'driver_map_screen.dart';
 import 'incoming_load_screen.dart';
 import '../profile/driver_settings_screen.dart';
+import '../../../data/repositories/user_repository.dart';
+import '../../../data/repositories/trip_repository.dart';
+import '../../../data/models/trip_model.dart';
+import 'trip_in_progress_screen.dart';
+
+// Provider — fetches the current driver's trips from Supabase
+final driverTripsProvider = FutureProvider<List<TripModel>>((ref) async {
+  final uid = FirebaseAuth.instance.currentUser?.uid;
+  if (uid == null) return [];
+  return TripRepository().getDriverTrips(uid);
+});
+
+// Activates GPS → Supabase sync reliably using ref.listen in initState
+class _LocationSyncActivator extends ConsumerStatefulWidget {
+  const _LocationSyncActivator();
+  @override
+  ConsumerState<_LocationSyncActivator> createState() =>
+      _LocationSyncActivatorState();
+}
+
+class _LocationSyncActivatorState
+    extends ConsumerState<_LocationSyncActivator> {
+  @override
+  void initState() {
+    super.initState();
+    // Listen to GPS stream and push to Supabase for every position update
+    ref.listenManual(driverLocationStreamProvider, (_, next) {
+      next.whenData((_) {
+        // driverLocationSyncProvider handles the actual Supabase write
+        ref.read(driverLocationSyncProvider);
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
 
 const _navy = Color(0xFF003F7D);
 const _amber = Color(0xFFF59E0B);
@@ -21,20 +60,66 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen>
   late TabController _tabController;
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
 
+  /// On app start — if the driver had an active trip going, jump straight to it.
+  Future<void> _resumeActiveTrip() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final trip = await TripRepository().getActiveTripForUser(uid);
+      if (trip == null || !mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TripInProgressScreen(trip: trip),
+        ),
+      );
+    } catch (_) {/* network glitch — let user navigate manually */}
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+
+    // 5.2 — Resume active trip if user closed the app mid-trip
+    WidgetsBinding.instance.addPostFrameCallback((_) => _resumeActiveTrip());
+    // Restore previous "online" state from DB
+    Future.microtask(() => ref.read(driverStateRestoreProvider));
+
+    // Show feedback if user tries to go offline while in active trip
+    ref.listenManual(driverOnlineProvider, (prev, next) {
+      if (prev == true && next == false) {
+        // The sync provider will revert it if server blocks; we don't
+        // know yet, so let the revert fire and surface a snackbar then.
+      }
+    });
+
+    // Listen for incoming requests and auto-show IncomingLoadScreen
+    ref.listenManual(incomingRequestProvider, (_, next) {
+      next.whenData((request) async {
+        final loadOwnerName = await UserRepository()
+            .getUser(request.loadOwnerId)
+            .then((u) => u?.name ?? 'Load Owner');
+        if (!mounted) return;
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => IncomingLoadScreen(
+            request: request,
+            loadOwnerName: loadOwnerName,
+          ),
+        ));
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isOnline = ref.watch(driverOnlineProvider);
+    ref.watch(driverOnlineStatusSyncProvider); // sync online status to Supabase
+    ref.watch(driverHeartbeatProvider); // keep parked driver visible
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -77,11 +162,17 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          _FindLoadsTab(),
-          _MyTripsTab(),
+      body: Stack(
+        children: [
+          TabBarView(
+            controller: _tabController,
+            children: const [
+              _FindLoadsTab(),
+              _MyTripsTab(),
+            ],
+          ),
+          // Invisible widget that activates GPS → Supabase sync while online
+          const _LocationSyncActivator(),
         ],
       ),
     );
@@ -243,11 +334,11 @@ class _StatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Row(
       children: [
-        _StatCard(label: 'Trips', value: '3'),
+        _StatCard(label: 'Trips', value: '0'),
         SizedBox(width: 10),
-        _StatCard(label: 'Hours', value: '4.5'),
+        _StatCard(label: 'Hours', value: '0'),
         SizedBox(width: 10),
-        _StatCard(label: 'Requests', value: '7'),
+        _StatCard(label: 'Requests', value: '0'),
       ],
     );
   }
@@ -322,21 +413,40 @@ class _NearbyLoadsSection extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        const _TappableLoadCard(
-          company: 'Rajesh Textiles',
-          location: 'Andheri · 2.4 km',
-          vehicleType: 'LCV · 800kg',
-          tripDistance: '12 km trip',
-          isNew: true,
-        ),
-        const SizedBox(height: 10),
-        const _TappableLoadCard(
-          company: 'Mehta Traders',
-          location: 'Bandra · 4.1 km',
-          vehicleType: 'Mini · 400kg',
-          tripDistance: '8 km trip',
-          isNew: false,
+        const SizedBox(height: 16),
+        // Real requests are pushed via Supabase Realtime — IncomingLoadScreen auto-opens
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.inbox_outlined,
+                  size: 40, color: Colors.grey.shade400),
+              const SizedBox(height: 10),
+              Text(
+                'No new loads yet',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "We'll notify you when a load owner sends a request",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: Colors.black45,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -484,7 +594,7 @@ class _LoadCardState extends State<_LoadCard>
                           child: Container(
                             height: 1.5,
                             width: (t * (trackWidth - 8)).clamp(0.0, trackWidth - 8),
-                            color: _amber.withOpacity(0.5),
+                            color: _amber.withValues(alpha: 0.5),
                           ),
                         ),
                         // Origin dot
@@ -648,10 +758,7 @@ class _TappableLoadCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const IncomingLoadScreen()),
-      ),
+      onTap: () {}, // Real requests come via Supabase Realtime
       child: _LoadCard(
         company: company,
         location: location,
@@ -665,48 +772,14 @@ class _TappableLoadCard extends StatelessWidget {
 
 // ─── My Trips Tab ────────────────────────────────────────────────────────────
 
-// Stateless now — filter state lives in tripFilterProvider
+// Loads real trips from Supabase
 class _MyTripsTab extends ConsumerWidget {
   const _MyTripsTab();
-
-  static const _trips = [
-    _TripRecord(
-      status: 'COMPLETED',
-      from: 'Andheri East',
-      to: 'Bandra West',
-      customer: 'Rajesh Sharma · 650kg',
-      distance: '12 km',
-      time: 'Today, 11:24 AM',
-      isCompleted: true,
-    ),
-    _TripRecord(
-      status: 'COMPLETED',
-      from: 'Powai',
-      to: 'Thane',
-      customer: 'Mehta Traders · 400kg',
-      distance: '18 km',
-      time: 'Today, 09:15 AM',
-      isCompleted: true,
-    ),
-    _TripRecord(
-      status: 'CANCELLED',
-      from: 'Goregaon',
-      to: 'Vashi',
-      customer: 'Sharma Logistics · 800kg',
-      distance: '22 km',
-      time: 'Yesterday',
-      isCompleted: false,
-    ),
-  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(tripFilterProvider);
-    final filtered = filter == 1
-        ? _trips.where((t) => t.isCompleted).toList()
-        : filter == 2
-            ? _trips.where((t) => !t.isCompleted).toList()
-            : _trips;
+    final tripsAsync = ref.watch(driverTripsProvider);
 
     return Column(
       children: [
@@ -736,19 +809,58 @@ class _MyTripsTab extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         Expanded(
-          child: filtered.isEmpty
-              ? const Center(
-                  child: Text('No trips found',
+          child: tripsAsync.when(
+            loading: () =>
+                const Center(child: CircularProgressIndicator(color: _navy)),
+            error: (e, _) => Center(
+              child: Text('Failed to load trips',
+                  style: TextStyle(color: Colors.red.shade700)),
+            ),
+            data: (trips) {
+              final filtered = filter == 1
+                  ? trips.where((t) => t.status == 'completed').toList()
+                  : filter == 2
+                      ? trips.where((t) => t.status == 'cancelled').toList()
+                      : trips;
+
+              if (filtered.isEmpty) {
+                return const Center(
+                  child: Text('No trips yet',
                       style: TextStyle(color: Colors.black45)),
-                )
-              : ListView.separated(
+                );
+              }
+
+              return RefreshIndicator(
+                onRefresh: () async => ref.refresh(driverTripsProvider.future),
+                child: ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: filtered.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) => _TripHistoryCard(trip: filtered[i]),
+                  itemBuilder: (_, i) =>
+                      _TripHistoryCard(trip: _toRecord(filtered[i])),
                 ),
+              );
+            },
+          ),
         ),
       ],
+    );
+  }
+
+  _TripRecord _toRecord(TripModel t) {
+    final isCompleted = t.status == 'completed';
+    final time = DateFormat('MMM d, hh:mm a').format(t.createdAt.toLocal());
+    return _TripRecord(
+      status: t.status.toUpperCase(),
+      from: t.pickupAddress,
+      to: t.dropAddress,
+      customer:
+          t.weightKg != null ? '${t.weightKg!.round()}kg' : 'No weight',
+      distance: t.distanceKm != null
+          ? '${t.distanceKm!.toStringAsFixed(1)} km'
+          : '-',
+      time: time,
+      isCompleted: isCompleted,
     );
   }
 }
