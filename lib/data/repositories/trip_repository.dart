@@ -66,6 +66,34 @@ class TripRepository {
     }
   }
 
+  /// Driver-only override for when the pinned drop location is wrong or the
+  /// site is larger than the arrival radius. Completes the trip but flags it
+  /// for review, recording where the driver actually was and how far that is
+  /// from the pinned drop point.
+  Future<void> completeTripFlagged({
+    required String tripId,
+    required double lat,
+    required double lng,
+    required double distanceMeters,
+  }) async {
+    final callerId = FirebaseAuth.instance.currentUser?.uid;
+    await _client.rpc('complete_trip_flagged', params: {
+      'p_trip_id': tripId,
+      'p_caller_id': callerId,
+      'p_lat': lat,
+      'p_lng': lng,
+      'p_distance_m': distanceMeters,
+    });
+  }
+
+  /// Stamps the moment the driver confirms they've collected the goods.
+  /// Used by both apps to switch from the pickup leg to the drop leg.
+  Future<void> markPickupConfirmed(String tripId) async {
+    await _client.from('trips').update({
+      'pickup_confirmed_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', tripId);
+  }
+
   /// Returns the user's currently active trip (if any).
   /// Used on app start to resume a session that was interrupted.
   Future<TripModel?> getActiveTripForUser(String userId) async {
@@ -96,14 +124,14 @@ class TripRepository {
       callback: (payload) async {
         final trip = TripModel.fromMap(payload.newRecord);
 
-        // Fire notifications based on status
+        // Fire notifications based on status.
+        // NOTE: total_trips is incremented server-side inside complete_trip;
+        // do NOT increment here or every observer would double-count (and
+        // could bump an arbitrary driver's count).
         if (trip.status == 'completed') {
           await NotificationService().notifyTripCompleted(
             distance: trip.distanceKm?.toStringAsFixed(1) ?? '?',
           );
-          // Increment driver total_trips in Supabase
-          await _client.rpc('increment_driver_trips',
-              params: {'driver_id': trip.driverId});
         }
 
         controller.add(trip);
@@ -129,18 +157,66 @@ class TripRepository {
         .toList();
   }
 
-  // ─── Get active trip ──────────────────────────────────────────────────────
+  // ─── Get trip history for load owner ─────────────────────────────────────
 
-  Future<TripModel?> getActiveTrip(String userId) async {
+  Future<List<TripModel>> getLoadOwnerTrips(String loadOwnerId,
+      {int limit = 50}) async {
     final response = await _client
         .from('trips')
         .select()
-        .or('driver_id.eq.$userId,load_owner_id.eq.$userId')
-        .inFilter('status', ['accepted', 'in_progress'])
+        .eq('load_owner_id', loadOwnerId)
         .order('created_at', ascending: false)
-        .limit(1)
-        .maybeSingle();
-    if (response == null) return null;
-    return TripModel.fromMap(response);
+        .limit(limit);
+    return (response as List)
+        .map((e) => TripModel.fromMap(e as Map<String, dynamic>))
+        .toList();
   }
+
+  // ─── Trip history enriched with counterparty (other-side) name & phone ──
+
+  Future<List<TripHistoryItem>> getTripHistory({
+    required String userId,
+    required bool isDriver,
+    int limit = 50,
+  }) async {
+    final trips = isDriver
+        ? await getDriverTrips(userId, limit: limit)
+        : await getLoadOwnerTrips(userId, limit: limit);
+    if (trips.isEmpty) return const [];
+    final counterIds = trips
+        .map((t) => isDriver ? t.loadOwnerId : t.driverId)
+        .toSet()
+        .toList();
+    final usersRows = await _client
+        .from('users')
+        .select('id, name, phone')
+        .inFilter('id', counterIds);
+    final byId = <String, Map<String, dynamic>>{
+      for (final u in (usersRows as List).cast<Map<String, dynamic>>())
+        u['id'] as String: u,
+    };
+    return trips.map((t) {
+      final counterId = isDriver ? t.loadOwnerId : t.driverId;
+      final u = byId[counterId];
+      return TripHistoryItem(
+        trip: t,
+        counterpartyName: (u?['name'] as String?) ?? 'Unknown',
+        counterpartyPhone: u?['phone'] as String?,
+      );
+    }).toList();
+  }
+}
+
+/// A trip plus the display name (and phone) of the *other* party from the
+/// caller's perspective — used by the shared trip-history list.
+class TripHistoryItem {
+  final TripModel trip;
+  final String counterpartyName;
+  final String? counterpartyPhone;
+
+  const TripHistoryItem({
+    required this.trip,
+    required this.counterpartyName,
+    this.counterpartyPhone,
+  });
 }
