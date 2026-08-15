@@ -53,7 +53,12 @@ class _TripInProgressScreenState
     _hasReachedPickup = widget.trip.pickupConfirmedAt != null;
     _startLocationTracking();
 
-    TripRepository().updateStatus(widget.trip.id, 'in_progress');
+    // Only transition into in_progress if we're actually resuming from
+    // 'accepted'. Trips already in_progress/completed/cancelled must not be
+    // overwritten (e.g. app relaunched during the drop leg).
+    if (widget.trip.status == 'accepted') {
+      TripRepository().updateStatus(widget.trip.id, 'in_progress');
+    }
   }
 
   void _startLocationTracking() {

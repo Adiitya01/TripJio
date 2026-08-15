@@ -75,17 +75,94 @@ class LocationPermissionScreen extends StatelessWidget {
                 height: 56,
                 child: ElevatedButton(
                   onPressed: () async {
-                    // Trigger the real OS location permission dialog here
-                    // so it never appears again when the map opens
+                    // Check if location services are enabled
+                    final serviceEnabled =
+                        await Geolocator.isLocationServiceEnabled();
+                    if (!serviceEnabled) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'Please enable Location Services in your phone settings'),
+                          backgroundColor: Colors.red,
+                          behavior: SnackBarBehavior.floating,
+                          duration: Duration(seconds: 4),
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Request permission
                     LocationPermission permission =
                         await Geolocator.checkPermission();
                     if (permission == LocationPermission.denied) {
                       permission = await Geolocator.requestPermission();
                     }
 
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.setString(
-                        'userType', isDriver ? 'driver' : 'loadOwner');
+                    // BLOCK if denied — don't proceed to home with wrong location
+                    if (permission == LocationPermission.denied) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'TripJio needs location to work. Please tap Allow.'),
+                          backgroundColor: Colors.red,
+                          behavior: SnackBarBehavior.floating,
+                          duration: Duration(seconds: 4),
+                        ),
+                      );
+                      return;
+                    }
+                    if (permission == LocationPermission.deniedForever) {
+                      if (!context.mounted) return;
+                      // Show dialog directing them to settings
+                      showDialog(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Location Permission Required'),
+                          content: const Text(
+                              'You\'ve denied location permanently. Please enable it in your phone\'s Settings → Apps → TripJio → Permissions → Location.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('OK'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Geolocator.openAppSettings();
+                              },
+                              child: const Text('Open Settings'),
+                            ),
+                          ],
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Permission granted — get an initial GPS fix BEFORE entering home
+                    // This guarantees the home screen has a real location
+                    try {
+                      final position = await Geolocator.getCurrentPosition(
+                        locationSettings: const LocationSettings(
+                          accuracy: LocationAccuracy.medium,
+                          timeLimit: Duration(seconds: 10),
+                        ),
+                      );
+                      // Cache to SharedPreferences so home screen uses it
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setDouble(
+                          'last_known_lat', position.latitude);
+                      await prefs.setDouble(
+                          'last_known_lng', position.longitude);
+                      await prefs.setString(
+                          'userType', isDriver ? 'driver' : 'loadOwner');
+                    } catch (_) {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setString(
+                          'userType', isDriver ? 'driver' : 'loadOwner');
+                    }
+
                     if (!context.mounted) return;
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(

@@ -1,7 +1,13 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/session_service.dart';
+import '../../data/repositories/user_repository.dart';
+import '../driver/home/driver_home_screen.dart';
+import '../load_owner/home/load_owner_home_screen.dart';
 import 'user_type_screen.dart';
 import 'load_owner_profile_screen.dart';
 import 'driver_profile_screen.dart';
@@ -33,6 +39,7 @@ class _OtpScreenState extends State<OtpScreen> {
   late Timer _timer;
   int _seconds = 60;
   bool _isLoading = false;
+  bool _isVerifying = false;
   late String _verificationId;
   int? _resendToken;
 
@@ -103,6 +110,8 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   Future<void> _verifyOtp() async {
+    if (_isVerifying) return;
+    _isVerifying = true;
     setState(() => _isLoading = true);
 
     try {
@@ -111,18 +120,35 @@ class _OtpScreenState extends State<OtpScreen> {
         smsCode: _otp,
       );
 
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      Widget nextScreen;
+      if (uid != null && await UserRepository().isProfileComplete(uid)) {
+        // Returning user — go straight to their home. Register the session so
+        // single-device enforcement kicks in for this device.
+        await SessionService.registerSession(uid);
+        final prefs = await SharedPreferences.getInstance();
+        final storedType = prefs.getString('userType');
+        final isDriver = storedType != null
+            ? storedType == 'driver'
+            : widget.userType == UserType.truck;
+        nextScreen = isDriver
+            ? const DriverHomeScreen()
+            : const LoadOwnerHomeScreen();
+      } else {
+        nextScreen = widget.userType == UserType.load
+            ? const LoadOwnerProfileScreen()
+            : const DriverProfileScreen();
+      }
+
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      // Navigate to profile setup screen
-      final screen = widget.userType == UserType.load
-          ? const LoadOwnerProfileScreen()
-          : const DriverProfileScreen();
-
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => screen),
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => nextScreen),
+        (_) => false,
       );
     } catch (e) {
+      _isVerifying = false;
       if (!mounted) return;
       setState(() => _isLoading = false);
 
@@ -230,6 +256,11 @@ class _OtpScreenState extends State<OtpScreen> {
                           _focusNodes[i - 1].requestFocus();
                         }
                         setState(() {});
+                        // Auto-submit when all 6 digits entered (Uber-style)
+                        if (i == 5 && val.isNotEmpty && _canVerify) {
+                          FocusScope.of(context).unfocus();
+                          _verifyOtp();
+                        }
                       },
                       decoration: InputDecoration(
                         counterText: '',

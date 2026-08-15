@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/distance_service.dart';
-import '../../../data/repositories/request_repository.dart';
 import '../../../data/repositories/trip_repository.dart';
 import '../../../data/models/request_model.dart';
 import '../../../data/models/trip_model.dart';
@@ -36,17 +35,6 @@ class _TripAcceptedScreenState extends ConsumerState<TripAcceptedScreen> {
         widget.request.pickupLng,
         widget.request.dropLat,
         widget.request.dropLng,
-      );
-
-  String get _fareLabel => DistanceService.fareLabel(
-        distanceKm: DistanceService.distanceInKm(
-          widget.request.pickupLat,
-          widget.request.pickupLng,
-          widget.request.dropLat,
-          widget.request.dropLng,
-        ),
-        vehicleType: 'Mini Truck',
-        weightKg: widget.request.weightKg ?? 0,
       );
 
   Future<void> _startTrip() async {
@@ -85,7 +73,7 @@ class _TripAcceptedScreenState extends ConsumerState<TripAcceptedScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to start trip: $e'),
+          content: const Text('Failed to start trip. Check your connection and try again.'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -96,10 +84,12 @@ class _TripAcceptedScreenState extends ConsumerState<TripAcceptedScreen> {
   }
 
   Future<void> _cancelTrip() async {
-    await RequestRepository().respondToRequest(
-      requestId: widget.request.id,
-      accepted: false,
-    );
+    try {
+      // Trip was already created atomically when the request was accepted, so
+      // cancel the trip (which also releases the driver's is_busy flag) rather
+      // than the request row.
+      await TripRepository().updateStatus(widget.tripId, 'cancelled');
+    } catch (_) {/* surface via home; still pop */}
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -191,20 +181,6 @@ class _TripAcceptedScreenState extends ConsumerState<TripAcceptedScreen> {
                                         color: Colors.black54)),
                               ],
                             ),
-                          ),
-                          // Fare badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: _navyLight,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(_fareLabel,
-                                style: const TextStyle(
-                                    color: _navy,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14)),
                           ),
                         ],
                       ),

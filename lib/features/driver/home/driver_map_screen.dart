@@ -117,6 +117,12 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   myLocationButtonEnabled: true,
                   zoomControlsEnabled: false,
                   mapToolbarEnabled: false,
+                  buildingsEnabled: false,
+                  trafficEnabled: false,
+                  indoorViewEnabled: false,
+                  compassEnabled: false,
+                  rotateGesturesEnabled: false,
+                  tiltGesturesEnabled: false,
                 ),
           if (!_loadingLocation)
             Positioned(

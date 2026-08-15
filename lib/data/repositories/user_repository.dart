@@ -47,4 +47,55 @@ class UserRepository {
     final user = await getUser(uid);
     return user != null;
   }
+
+  /// Permanently delete a user account.
+  /// Foreign-key CASCADE removes related drivers/vehicles/trips/requests rows.
+  /// Caller must also sign out of Firebase + clear local SharedPreferences.
+  Future<void> deleteAccount(String uid) async {
+    await _client.from('users').delete().eq('id', uid);
+    // active_sessions, drivers, vehicles cascade automatically via ON DELETE CASCADE
+  }
+
+  // ─── ACID atomic signups ──────────────────────────────────────────────────
+
+  /// Single-transaction driver signup. Either all 3 inserts (users + drivers
+  /// + vehicles) succeed or NONE — no orphan accounts on partial failure.
+  Future<void> signupDriverAtomic({
+    required String uid,
+    required String phone,
+    required String name,
+    required String licenseNumber,
+    required String experience,
+    required String vehicleId,
+    required String vehicleNumber,
+    required String vehicleType,
+  }) async {
+    await _client.rpc('signup_driver_atomic', params: {
+      'p_uid': uid,
+      'p_phone': phone,
+      'p_name': name,
+      'p_license_number': licenseNumber,
+      'p_experience': experience,
+      'p_vehicle_id': vehicleId,
+      'p_vehicle_number': vehicleNumber,
+      'p_vehicle_type': vehicleType,
+    });
+  }
+
+  /// Single-transaction load owner signup.
+  Future<void> signupLoadOwnerAtomic({
+    required String uid,
+    required String phone,
+    required String name,
+    String? companyName,
+    String? city,
+  }) async {
+    await _client.rpc('signup_load_owner_atomic', params: {
+      'p_uid': uid,
+      'p_phone': phone,
+      'p_name': name,
+      'p_company_name': companyName,
+      'p_city': city,
+    });
+  }
 }

@@ -137,7 +137,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Refresh Firebase token + verify this device is still the active session.
     // If user signed in on another device → force log out here (1.2 + 1.8).
-    if (isLoggedIn && firebaseUser != null) {
+    if (isLoggedIn) {
       await SessionService.refreshAuthToken();
       try {
         final stillValid =

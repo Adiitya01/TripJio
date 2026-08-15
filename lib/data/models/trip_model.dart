@@ -14,6 +14,7 @@ class TripModel {
   final double? weightKg;
   final DateTime createdAt;
   final DateTime? completedAt;
+  final DateTime? pickupConfirmedAt;
 
   const TripModel({
     required this.id,
@@ -31,6 +32,7 @@ class TripModel {
     this.weightKg,
     required this.createdAt,
     this.completedAt,
+    this.pickupConfirmedAt,
   });
 
   factory TripModel.fromMap(Map<String, dynamic> map) {
@@ -52,6 +54,9 @@ class TripModel {
       completedAt: map['completed_at'] != null
           ? DateTime.parse(map['completed_at'] as String)
           : null,
+      pickupConfirmedAt: map['pickup_confirmed_at'] != null
+          ? DateTime.parse(map['pickup_confirmed_at'] as String)
+          : null,
     );
   }
 
@@ -72,6 +77,7 @@ class TripModel {
       'weight_kg': weightKg,
       'created_at': createdAt.toIso8601String(),
       'completed_at': completedAt?.toIso8601String(),
+      'pickup_confirmed_at': pickupConfirmedAt?.toIso8601String(),
     };
   }
 }

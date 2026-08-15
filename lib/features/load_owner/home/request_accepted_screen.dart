@@ -145,28 +145,6 @@ class RequestAcceptedScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 48),
-                  
-                  // ETA
-                  const Text(
-                    'ETA',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black38,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    '8 min',
-                    style: TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: _navy,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
                 ],
               ),
             ),

@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'session_service.dart';
+import '../../data/repositories/driver_repository.dart';
 import '../../features/driver/home/driver_home_screen.dart' show driverTripsProvider;
+import '../../features/driver/providers/driver_provider.dart';
 
 /// Observes app lifecycle events and:
 ///  - refreshes Firebase auth token on resume
@@ -19,6 +23,8 @@ class AppLifecycleService extends ConsumerStatefulWidget {
 
 class _AppLifecycleServiceState extends ConsumerState<AppLifecycleService>
     with WidgetsBindingObserver {
+  Timer? _idleOfflineTimer;
+
   @override
   void initState() {
     super.initState();
@@ -27,25 +33,48 @@ class _AppLifecycleServiceState extends ConsumerState<AppLifecycleService>
 
   @override
   void dispose() {
+    _idleOfflineTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // App came back to foreground — refresh auth + critical providers
-      _onResume();
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _idleOfflineTimer?.cancel();
+        _onResume();
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        // App backgrounded — start countdown to auto-offline (Uber-style).
+        // If still backgrounded after 5 min, voluntarily set offline.
+        _scheduleAutoOffline();
+        break;
+      default:
+        break;
     }
   }
 
   Future<void> _onResume() async {
-    // 1. Refresh Firebase ID token (avoid expired-token errors)
     await SessionService.refreshAuthToken();
-
-    // 2. Invalidate providers that may have stale data
-    //    Drivers list, trip history, active trip — let them refetch on next read
     ref.invalidate(driverTripsProvider);
+  }
+
+  void _scheduleAutoOffline() {
+    _idleOfflineTimer?.cancel();
+    // Only relevant if user is a driver who's currently online
+    final isOnline = ref.read(driverOnlineProvider);
+    if (!isOnline) return;
+
+    _idleOfflineTimer = Timer(const Duration(minutes: 5), () async {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+      try {
+        await DriverRepository().setOnlineStatus(uid, online: false);
+        ref.read(driverOnlineProvider.notifier).state = false;
+      } catch (_) {/* server's auto-offline RPC will catch it anyway */}
+    });
   }
 
   @override

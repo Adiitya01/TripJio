@@ -2,7 +2,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/session_service.dart';
-import '../../data/models/user_model.dart';
 import '../../data/repositories/user_repository.dart';
 import 'location_permission_screen.dart';
 
@@ -43,17 +42,16 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
       final uid = user?.uid ?? '';
       final phone = user?.phoneNumber ?? '';
 
-      await UserRepository().saveUser(UserModel(
-        id: uid,
+      // ⚛️ ACID: atomic load owner signup (single transaction)
+      await UserRepository().signupLoadOwnerAtomic(
+        uid: uid,
         phone: phone,
         name: _nameController.text.trim(),
-        userType: 'load_owner',
         companyName: _companyController.text.trim().isNotEmpty
             ? _companyController.text.trim()
             : null,
         city: _selectedCity,
-        createdAt: DateTime.now(),
-      ));
+      );
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isLoggedIn', true);
@@ -74,7 +72,7 @@ class _LoadOwnerProfileScreenState extends State<LoadOwnerProfileScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to save profile: $e'),
+          content: const Text('Failed to save profile. Please try again.'),
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
         ),

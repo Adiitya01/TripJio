@@ -1,8 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart' as geo;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../../../core/services/distance_service.dart';
 import '../../../data/repositories/request_repository.dart';
 import 'waiting_for_driver_screen.dart';
 
@@ -37,7 +37,9 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
     try {
       final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) return;
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
       final position = await Geolocator.getCurrentPosition(
         locationSettings:
             const LocationSettings(accuracy: LocationAccuracy.high),
@@ -80,6 +82,10 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
       _showError('Pickup location required');
       return;
     }
+    if (drop.isEmpty) {
+      _showError('Please provide a valid drop address');
+      return;
+    }
     if (pickup.length > 500 || drop.length > 500) {
       _showError('Address too long (max 500 chars)');
       return;
@@ -101,18 +107,35 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
+      // Geocode drop address so the trip has real coordinates for tracking
+      // and arrival detection. Fail hard rather than fall through with fakes.
+      double dropLat;
+      double dropLng;
+      try {
+        final results = await geo.locationFromAddress(drop);
+        if (results.isEmpty) {
+          _showError('Please provide a valid drop address');
+          if (mounted) setState(() => _isSending = false);
+          return;
+        }
+        dropLat = results.first.latitude;
+        dropLng = results.first.longitude;
+      } catch (_) {
+        _showError('Please provide a valid drop address');
+        if (mounted) setState(() => _isSending = false);
+        return;
+      }
+
       // Create real Supabase request
       final request = await RequestRepository().createRequest(
         loadOwnerId: uid,
         driverId: widget.driver.userId ?? '',
         pickupAddress: _pickupController.text.trim(),
-        dropAddress: _dropController.text.trim().isNotEmpty
-            ? _dropController.text.trim()
-            : 'Destination TBD',
+        dropAddress: drop,
         pickupLat: _pickupLatLng.latitude,
         pickupLng: _pickupLatLng.longitude,
-        dropLat: _pickupLatLng.latitude - 0.05, // placeholder drop
-        dropLng: _pickupLatLng.longitude + 0.05,
+        dropLat: dropLat,
+        dropLng: dropLng,
         goodsDescription: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
             : null,
@@ -151,19 +174,7 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
   Widget build(BuildContext context) {
     final String driverName = widget.driver.name ?? 'Driver';
     final String vehicleInfo = widget.driver.vehicle ?? '';
-    final String vehicleType = widget.driver.vehicleType ?? vehicleInfo;
-    final String distanceInfo =
-        '${widget.driver.distanceKm?.toStringAsFixed(1) ?? widget.driver.distance ?? '?'} km away';
     final double ratingInfo = widget.driver.rating ?? 4.8;
-    final double weightKg =
-        double.tryParse(_weightController.text.trim()) ?? 0;
-    final double distKm = widget.driver.distanceKm ?? 5.0;
-    final String fareLabel = DistanceService.fareLabel(
-      distanceKm: distKm,
-      vehicleType: vehicleType,
-      weightKg: weightKg,
-    );
-    final String etaText = DistanceService.etaLabel(distKm);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -225,7 +236,7 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
                                       fontSize: 16,
                                       color: Colors.black87)),
                               const SizedBox(height: 4),
-                              Text('$vehicleInfo · $distanceInfo',
+                              Text(vehicleInfo,
                                   style: const TextStyle(
                                       fontSize: 13,
                                       color: Colors.black54)),
@@ -242,29 +253,6 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
                                   fontWeight: FontWeight.w600,
                                   color: Colors.black87)),
                         ]),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Fare + ETA summary
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF003F7D),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _SummaryCell(
-                            label: 'Est. Fare', value: fareLabel),
-                        _SummaryCell(label: 'ETA', value: etaText),
-                        _SummaryCell(
-                            label: 'Distance',
-                            value:
-                                '${distKm.toStringAsFixed(1)} km'),
                       ],
                     ),
                   ),
@@ -298,7 +286,6 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
                   TextField(
                     controller: _weightController,
                     keyboardType: TextInputType.number,
-                    onChanged: (_) => setState(() {}),
                     decoration: _inputDeco(
                       hint: '650',
                       prefixIcon: const Icon(Icons.scale_outlined,
@@ -390,23 +377,3 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
       );
 }
 
-class _SummaryCell extends StatelessWidget {
-  final String label;
-  final String value;
-  const _SummaryCell({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(children: [
-      Text(label,
-          style: const TextStyle(
-              color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500)),
-      const SizedBox(height: 4),
-      Text(value,
-          style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold)),
-    ]);
-  }
-}

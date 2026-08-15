@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/skeleton_card.dart';
 import '../../../data/repositories/driver_repository.dart';
 import '../providers/load_owner_provider.dart';
 import 'send_request_screen.dart';
@@ -82,8 +84,7 @@ class _DriversListScreenState extends ConsumerState<DriversListScreen> {
           ),
           Expanded(
             child: driversAsync.when(
-              loading: () => const Center(
-                  child: CircularProgressIndicator(color: _navy)),
+              loading: () => const SkeletonList(itemCount: 6),
               error: (e, _) => Center(
                 child: Text('Failed to load drivers',
                     style: TextStyle(color: Colors.red.shade700)),
@@ -97,20 +98,21 @@ class _DriversListScreenState extends ConsumerState<DriversListScreen> {
                         .toList();
 
                 if (filtered.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'No online drivers nearby right now.\nTry again in a few minutes.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: Colors.black54, fontSize: 14),
-                      ),
-                    ),
+                  return EmptyState(
+                    icon: Icons.local_shipping_outlined,
+                    title: 'No drivers nearby',
+                    message: 'No online drivers in your area right now.\nTry again in a few minutes.',
+                    actionLabel: 'Refresh',
+                    onAction: () =>
+                        ref.invalidate(nearbyDriversProvider(userLocation!)),
                   );
                 }
 
-                return ListView.separated(
+                return RefreshIndicator(
+                  color: _navy,
+                  onRefresh: () async => ref.invalidate(
+                      nearbyDriversProvider(userLocation!)),
+                  child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                   itemCount: filtered.length,
                   separatorBuilder: (_, __) =>
@@ -138,6 +140,7 @@ class _DriversListScreenState extends ConsumerState<DriversListScreen> {
                       ),
                     ),
                   ),
+                ),
                 );
               },
             ),
@@ -262,7 +265,7 @@ class _DriverCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 5),
                         Text(
-                          'Online · ${driver.distanceKm.toStringAsFixed(1)} km away',
+                          'Online',
                           style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF1A7A4A),

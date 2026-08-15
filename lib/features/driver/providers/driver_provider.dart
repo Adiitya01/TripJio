@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/location_service.dart';
 import '../../../data/repositories/location_repository.dart';
 import '../../../data/repositories/driver_repository.dart';
@@ -30,29 +31,34 @@ final driverOnlineStatusSyncProvider = Provider<void>((ref) {
   if (uid == null) return;
 
   () async {
-    try {
-      final result =
-          await DriverRepository().setOnlineStatus(uid, online: isOnline);
-      if (result == 'blocked_active_trip') {
-        // Revert UI toggle — driver can't go offline mid-trip
-        ref.read(driverOnlineProvider.notifier).state = true;
-        return;
-      }
-    } catch (_) {/* network glitch — will retry on next toggle */}
-
-    // On going online → capture current location once
     if (isOnline) {
+      // ⚛️ ACID: combined go-online + GPS push in ONE transaction.
+      // Driver never appears online with stale location.
       try {
         final position = await Geolocator.getCurrentPosition(
           locationSettings:
               const LocationSettings(accuracy: LocationAccuracy.high),
         );
-        await LocationRepository().updateDriverLocation(
-          driverId: uid,
-          latitude: position.latitude,
-          longitude: position.longitude,
-        );
-      } catch (_) {/* permission/GPS off — continuous stream will retry */}
+        await Supabase.instance.client.rpc('go_online_with_location', params: {
+          'p_user_id': uid,
+          'p_latitude': position.latitude,
+          'p_longitude': position.longitude,
+        });
+      } catch (_) {
+        // Fallback: at least mark online (no location)
+        try {
+          await DriverRepository().setOnlineStatus(uid, online: true);
+        } catch (_) {}
+      }
+    } else {
+      // Going offline — safe RPC blocks if active trip
+      try {
+        final result =
+            await DriverRepository().setOnlineStatus(uid, online: false);
+        if (result == 'blocked_active_trip') {
+          ref.read(driverOnlineProvider.notifier).state = true;
+        }
+      } catch (_) {}
     }
   }();
 });

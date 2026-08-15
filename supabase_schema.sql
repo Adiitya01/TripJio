@@ -54,7 +54,8 @@ create table if not exists public.trips (
   goods_description text,
   weight_kg numeric(8,2),
   created_at timestamptz not null default now(),
-  completed_at timestamptz
+  completed_at timestamptz,
+  pickup_confirmed_at timestamptz
 );
 
 -- REQUESTS table
@@ -85,24 +86,14 @@ alter table public.vehicles enable row level security;
 alter table public.trips enable row level security;
 alter table public.requests enable row level security;
 
--- Allow anon + authenticated to insert/select their own records
-create policy "Users can insert own profile" on public.users
-  for insert with check (true);
-
-create policy "Users can read own profile" on public.users
-  for select using (true);
-
-create policy "Users can update own profile" on public.users
-  for update using (true);
-
-create policy "Allow all on drivers" on public.drivers
-  for all using (true) with check (true);
-
-create policy "Allow all on vehicles" on public.vehicles
-  for all using (true) with check (true);
-
-create policy "Allow all on trips" on public.trips
-  for all using (true) with check (true);
-
-create policy "Allow all on requests" on public.requests
-  for all using (true) with check (true);
+-- ============================================================
+-- NO POLICIES ARE DEFINED HERE ON PURPOSE.
+--
+-- RLS is enabled above, which means until real policies exist,
+-- authenticated/anon requests get zero rows — a safe default.
+--
+-- The real, owner-scoped policies + hardened RPCs live in
+-- `supabase_auth_hardening.sql` (run LAST). Do not add
+-- `USING (true)` policies here as a temporary shortcut: they
+-- expose every user's data to any anon-key holder.
+-- ============================================================

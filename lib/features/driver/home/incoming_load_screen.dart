@@ -76,7 +76,7 @@ class _IncomingLoadScreenState extends State<IncomingLoadScreen> {
         SnackBar(
           content: Text(e.toString().contains('expired')
               ? 'Request expired'
-              : 'Failed to accept: $e'),
+              : 'Could not accept request. Please try again.'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -99,14 +99,6 @@ class _IncomingLoadScreenState extends State<IncomingLoadScreen> {
     final distLabel = DistanceService.distanceLabel(
       widget.request.pickupLat, widget.request.pickupLng,
       widget.request.dropLat, widget.request.dropLng,
-    );
-    final fareLabel = DistanceService.fareLabel(
-      distanceKm: DistanceService.distanceInKm(
-        widget.request.pickupLat, widget.request.pickupLng,
-        widget.request.dropLat, widget.request.dropLng,
-      ),
-      vehicleType: 'Mini Truck',
-      weightKg: widget.request.weightKg ?? 0,
     );
 
     return Scaffold(
@@ -191,22 +183,11 @@ class _IncomingLoadScreenState extends State<IncomingLoadScreen> {
                                   color: Colors.black54, size: 26),
                             ),
                             const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(widget.loadOwnerName,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: Colors.black87)),
-                                const SizedBox(height: 2),
-                                Text(fareLabel,
-                                    style: const TextStyle(
-                                        fontSize: 14,
-                                        color: _navy,
-                                        fontWeight: FontWeight.bold)),
-                              ],
-                            ),
+                            Text(widget.loadOwnerName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.black87)),
                           ]),
                           const SizedBox(height: 18),
                           _DotRow(

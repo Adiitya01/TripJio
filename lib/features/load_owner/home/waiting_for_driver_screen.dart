@@ -32,6 +32,7 @@ class _WaitingForDriverScreenState extends ConsumerState<WaitingForDriverScreen>
   late Timer _timer;
   int _secondsLeft = 120; // 2 minutes to match request expiry
   StreamSubscription<RequestModel>? _requestSub;
+  bool _isCancelling = false;
 
   static const Color _navy = Color(0xFF003F7D);
   static const Color _navyLight = Color(0xFFE6EEF8);
@@ -91,6 +92,8 @@ class _WaitingForDriverScreenState extends ConsumerState<WaitingForDriverScreen>
   }
 
   Future<void> _cancelRequest() async {
+    if (_isCancelling) return; // prevent double-tap
+    setState(() => _isCancelling = true);
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     try {
       await RequestRepository().cancelRequestByLoadOwner(
@@ -142,7 +145,7 @@ class _WaitingForDriverScreenState extends ConsumerState<WaitingForDriverScreen>
                 padding: const EdgeInsets.all(12.0),
                 child: IconButton(
                   icon: const Icon(Icons.close, color: Colors.black87),
-                  onPressed: _cancelRequest,
+                  onPressed: _isCancelling ? null : _cancelRequest,
                 ),
               ),
             ),
@@ -230,14 +233,21 @@ class _WaitingForDriverScreenState extends ConsumerState<WaitingForDriverScreen>
                   width: double.infinity,
                   height: 54,
                   child: OutlinedButton(
-                    onPressed: _cancelRequest,
+                    onPressed: _isCancelling ? null : _cancelRequest,
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(
                           color: Colors.redAccent, width: 1.5),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(27)),
                     ),
-                    child: const Text(
+                    child: _isCancelling
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.redAccent))
+                        : const Text(
                       'Cancel Request',
                       style: TextStyle(
                           color: Colors.redAccent,

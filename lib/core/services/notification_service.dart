@@ -1,6 +1,13 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../main.dart' show navigatorKey;
+import '../../features/driver/home/driver_home_screen.dart';
+import '../../features/load_owner/home/load_owner_home_screen.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -22,17 +29,24 @@ class NotificationService {
       final settings = await _fcm.requestPermission(
           alert: true, badge: true, sound: true);
 
-      // 2. Save FCM token only if permission granted
+      // 2. Save FCM token if permission granted
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         final token = await _fcm.getToken();
         if (token != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('fcm_token', token);
+          await syncFcmTokenToSupabase(token);
         }
       }
+
+      // 3. Listen for token refresh (FCM rotates tokens periodically)
+      _fcm.onTokenRefresh.listen((token) async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('fcm_token', token);
+        await syncFcmTokenToSupabase(token);
+      });
     } catch (_) {
-      // Notifications blocked or unavailable (incognito, unsupported browser)
-      // App continues working — notifications are non-critical
+      // Notifications blocked or unavailable
     }
 
     // 3. Initialize local notifications
@@ -42,7 +56,21 @@ class NotificationService {
     await _localNotifications.initialize(
       settings: const InitializationSettings(
           android: androidSettings, iOS: iosSettings),
-      onDidReceiveNotificationResponse: (_) {},
+      onDidReceiveNotificationResponse: (response) {
+        // Payload was JSON-encoded from the FCM data map when we surfaced
+        // this notification via _showLocalNotification.
+        final payload = response.payload;
+        if (payload == null || payload.isEmpty) {
+          _handleNotificationTap(const {});
+          return;
+        }
+        try {
+          final decoded = jsonDecode(payload);
+          if (decoded is Map) {
+            _handleNotificationTap(decoded.cast<String, dynamic>());
+          }
+        } catch (_) {/* ignore malformed payload */}
+      },
     );
 
     // 4. Create Android notification channel
@@ -64,9 +92,68 @@ class NotificationService {
         showNotification(
           title: notification.title ?? 'TripJio',
           body: notification.body ?? '',
+          payload: jsonEncode(message.data),
         );
       }
     });
+
+    // 6. Route notification taps.
+    // Terminated-app open:
+    final initialMessage = await _fcm.getInitialMessage();
+    if (initialMessage != null) {
+      // Delay one frame so the navigator has mounted before we push.
+      WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _handleNotificationTap(initialMessage.data));
+    }
+    // Background-app open:
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      _handleNotificationTap(message.data);
+    });
+  }
+
+  // ─── Tap routing ──────────────────────────────────────────────────────────
+
+  /// Routes a notification tap based on its FCM `data` payload. We push the
+  /// user to the appropriate home screen and let its Realtime listeners
+  /// surface the actual incoming-request / live-tracking screen — this keeps
+  /// the routing dependency-light and avoids reconstructing full models from
+  /// the payload.
+  Future<void> _handleNotificationTap(Map<String, dynamic> data) async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+    final type = data['type']?.toString();
+    final prefs = await SharedPreferences.getInstance();
+    final userType = prefs.getString('userType');
+    Widget? target;
+    if (type == 'incoming_request') {
+      target = const DriverHomeScreen();
+    } else if (type == 'trip_accepted') {
+      target = const LoadOwnerHomeScreen();
+    } else if (type == 'trip_completed' || type == 'trip_cancelled') {
+      target = userType == 'driver'
+          ? const DriverHomeScreen()
+          : const LoadOwnerHomeScreen();
+    }
+    if (target == null) return;
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => target!),
+      (_) => false,
+    );
+  }
+
+  // ─── Sync FCM token to Supabase active_sessions ──────────────────────────
+
+  /// Saves the device's FCM token to the user's active_sessions row.
+  /// The Edge Function reads this to know where to send push notifications.
+  Future<void> syncFcmTokenToSupabase(String token) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+      await Supabase.instance.client
+          .from('active_sessions')
+          .update({'fcm_token': token})
+          .eq('user_id', uid);
+    } catch (_) {/* network glitch — will retry on next token refresh */}
   }
 
   // ─── Show local notification ───────────────────────────────────────────────
@@ -75,6 +162,7 @@ class NotificationService {
     required String title,
     required String body,
     int id = 0,
+    String? payload,
   }) async {
     const androidDetails = AndroidNotificationDetails(
       _channelId,
@@ -91,6 +179,7 @@ class NotificationService {
       body: body,
       notificationDetails: const NotificationDetails(
           android: androidDetails, iOS: iosDetails),
+      payload: payload,
     );
   }
 

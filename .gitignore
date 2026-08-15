@@ -7,6 +7,11 @@
 .pub/
 build/
 
+# Release signing — NEVER commit these
+android/key.properties
+*.jks
+*.keystore
+
 # Android
 .gradle/
 local.properties
@@ -21,8 +26,9 @@ Pods/
 .symlinks/
 
 # Environments
-.env.dev
-.env.prod
+.env
+.env.*
+!.env.example
 
 # IDEs
 .idea/

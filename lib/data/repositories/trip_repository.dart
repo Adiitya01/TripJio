@@ -94,6 +94,18 @@ class TripRepository {
     }).eq('id', tripId);
   }
 
+  /// Fetches a specific trip by id. Used to disambiguate cancelled vs
+  /// completed when the active-trip lookup returns null after a status change.
+  Future<TripModel?> getTripById(String tripId) async {
+    final response = await _client
+        .from('trips')
+        .select()
+        .eq('id', tripId)
+        .maybeSingle();
+    if (response == null) return null;
+    return TripModel.fromMap(response);
+  }
+
   /// Returns the user's currently active trip (if any).
   /// Used on app start to resume a session that was interrupted.
   Future<TripModel?> getActiveTripForUser(String userId) async {

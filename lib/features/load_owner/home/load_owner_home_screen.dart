@@ -1,11 +1,19 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/load_owner_provider.dart';
 import '../../../data/repositories/driver_repository.dart';
+import '../../../data/repositories/trip_repository.dart';
+import '../../../data/repositories/user_repository.dart';
+import '../../../core/widgets/welcome_dialog.dart';
+import '../../shared/account_settings_screen.dart';
 import 'drivers_list_screen.dart';
+import 'live_tracking_screen.dart';
 import 'send_request_screen.dart';
 
 const _navy = Color(0xFF003F7D);
@@ -32,53 +40,139 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
   List<_TruckPin> _trucks = [];
 
   GoogleMapController? _mapController;
-  LatLng _mapCenter = const LatLng(19.0760, 72.8777);
-  bool _loadingLocation = true;
+  // Default to (0, 0) — invisible "no location" state
+  // Real location is set as soon as GPS or cache provides it
+  LatLng _mapCenter = const LatLng(20.5937, 78.9629); // India center (neutral)
+  bool _hasRealLocation = false; // ⭐ Tracks if we have actual user GPS
+  bool _locationPermissionDenied = false;
+
+  static const _kLastLatKey = 'last_known_lat';
+  static const _kLastLngKey = 'last_known_lng';
 
   @override
   void initState() {
     super.initState();
-    _fetchCurrentLocation();
+    _initLocationFast();
+    // First-time welcome (shows once)
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => WelcomeDialog.showOnce(context, isDriver: false));
+    // If a trip is already running, jump back into live tracking. Mirrors
+    // the driver-side _resumeActiveTrip — the load owner must not lose
+    // visibility into an in-flight trip on app restart.
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _resumeActiveTrip());
   }
 
-  Future<void> _fetchCurrentLocation() async {
+  Future<void> _resumeActiveTrip() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() => _loadingLocation = false);
+      final trip = await TripRepository().getActiveTripForUser(uid);
+      if (trip == null || !mounted) return;
+      final driver = await DriverRepository().getDriverProfile(trip.driverId);
+      if (driver == null || !mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => LiveTrackingScreen(
+            driver: driver,
+            driverId: trip.driverId,
+            pickupLocation: LatLng(trip.pickupLat, trip.pickupLng),
+            requestId: trip.id,
+          ),
+        ),
+      );
+    } catch (_) {/* network glitch — user can manually re-enter via UI */}
+  }
+
+  /// Uber-style fast location:
+  /// 1. Use SharedPreferences cached location (instant)
+  /// 2. Use Geolocator's last known position (instant, no GPS lock)
+  /// 3. In the background, fetch fresh GPS and animate to it
+  Future<void> _initLocationFast() async {
+    // ─── Step 1: SharedPreferences cache (instant, survives app restarts)
+    final prefs = await SharedPreferences.getInstance();
+    final cachedLat = prefs.getDouble(_kLastLatKey);
+    final cachedLng = prefs.getDouble(_kLastLngKey);
+    if (cachedLat != null && cachedLng != null) {
+      final cached = LatLng(cachedLat, cachedLng);
+      if (mounted) {
+        setState(() {
+          _mapCenter = cached;
+          _hasRealLocation = true;
+        });
+      }
+      ref.read(userLocationProvider.notifier).state =
+          (lat: cachedLat, lng: cachedLng);
+    }
+
+    // ─── Step 2: Geolocator's last known position (instant, no GPS wait)
+    try {
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null && mounted) {
+        setState(() {
+          _mapCenter = LatLng(lastKnown.latitude, lastKnown.longitude);
+          _hasRealLocation = true;
+        });
+        ref.read(userLocationProvider.notifier).state =
+            (lat: lastKnown.latitude, lng: lastKnown.longitude);
+      }
+    } catch (_) {/* ignore */}
+
+    // ─── Step 3: Fresh GPS in background
+    _fetchFreshLocation();
+  }
+
+  Future<void> _fetchFreshLocation() async {
+    try {
+      // Check service
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (mounted) {
+          setState(() => _locationPermissionDenied = !_hasRealLocation);
+        }
         return;
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
+      // Permission
+      var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          setState(() => _loadingLocation = false);
-          return;
-        }
       }
-
-      if (permission == LocationPermission.deniedForever) {
-        setState(() => _loadingLocation = false);
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() => _locationPermissionDenied = !_hasRealLocation);
+        }
         return;
       }
 
+      // Get fresh GPS
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 10),
+        ),
       );
 
       final newCenter = LatLng(position.latitude, position.longitude);
-      // Push user location to provider so nearbyDriversProvider can query
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_kLastLatKey, position.latitude);
+      await prefs.setDouble(_kLastLngKey, position.longitude);
+
       ref.read(userLocationProvider.notifier).state =
           (lat: position.latitude, lng: position.longitude);
+
+      if (!mounted) return;
       setState(() {
         _mapCenter = newCenter;
-        _loadingLocation = false;
+        _hasRealLocation = true;
+        _locationPermissionDenied = false;
       });
-
       _mapController?.animateCamera(CameraUpdate.newLatLng(newCenter));
     } catch (_) {
-      setState(() => _loadingLocation = false);
+      // GPS failed — if we still don't have a real location, show the warning
+      if (mounted && !_hasRealLocation) {
+        setState(() => _locationPermissionDenied = true);
+      }
     }
   }
 
@@ -111,8 +205,10 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
     final userLocation = ref.watch(userLocationProvider);
 
     // Fetch real drivers from Supabase when location is available
-    final driversAsync = userLocation == null
-        ? const AsyncValue<List<NearbyDriver>>.loading()
+    // CRITICAL: only query when we have a REAL user location, not the
+    // fallback. Otherwise we'd query drivers around the wrong city.
+    final driversAsync = (userLocation == null || !_hasRealLocation)
+        ? const AsyncValue<List<NearbyDriver>>.data([])
         : ref.watch(nearbyDriversProvider(userLocation));
 
     // Convert real drivers to truck pins
@@ -149,8 +245,15 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.menu, color: Colors.black87),
-                    onPressed: () {},
+                    icon: const Icon(Icons.account_circle_outlined,
+                        color: Colors.black87, size: 28),
+                    tooltip: 'Profile',
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AccountSettingsScreen(),
+                      ),
+                    ),
                   ),
                   Expanded(
                     child: Text(
@@ -177,34 +280,54 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
                 GoogleMap(
                   initialCameraPosition: CameraPosition(
                     target: _mapCenter,
-                    zoom: 13,
+                    zoom: 14, // Zoom 14 = neighbourhood view, loads fewer tiles
                   ),
                   markers: _buildMarkers(),
                   myLocationEnabled: true,
                   myLocationButtonEnabled: false,
                   zoomControlsEnabled: false,
                   mapToolbarEnabled: false,
+                  // ⭐ Performance optimizations (Uber-style)
+                  buildingsEnabled: false,    // No 3D buildings — faster tiles
+                  trafficEnabled: false,      // No traffic overlay — fewer API calls
+                  indoorViewEnabled: false,   // No indoor maps — faster render
+                  liteModeEnabled: false,     // Keep interactive (false = full map)
+                  compassEnabled: false,      // Save GPU
+                  rotateGesturesEnabled: false, // Disable rotate for cleaner UX
+                  tiltGesturesEnabled: false,   // Disable tilt
                   onMapCreated: (controller) {
                     _mapController = controller;
-                    if (!_loadingLocation) {
-                      controller.animateCamera(CameraUpdate.newLatLng(_mapCenter));
-                    }
+                    controller.animateCamera(CameraUpdate.newLatLng(_mapCenter));
                   },
                 ),
-                if (_loadingLocation)
-                  Container(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    child: const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(color: _navy),
-                          SizedBox(height: 12),
-                          Text('Fetching your location...'),
+                // Tiny non-blocking GPS indicator (corner)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 300),
+                    opacity: 0.0,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 4,
+                              offset: Offset(0, 2))
                         ],
+                      ),
+                      child: const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: _navy),
                       ),
                     ),
                   ),
+                ),
                 // Filter chips
                 Positioned(
                   top: 12,
@@ -224,6 +347,116 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
                         onTap: () {},
                       ),
                     ],
+                  ),
+                ),
+                // ⚠️ Critical: warn user if location isn't real
+                if (_locationPermissionDenied || !_hasRealLocation)
+                  Positioned(
+                    top: 60,
+                    left: 12,
+                    right: 12,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border:
+                              Border.all(color: Colors.orange.shade300),
+                          boxShadow: const [
+                            BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 6,
+                                offset: Offset(0, 2)),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded,
+                                color: Colors.orange.shade800, size: 22),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _locationPermissionDenied
+                                        ? 'Location not available'
+                                        : 'Getting your location...',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange.shade900,
+                                    ),
+                                  ),
+                                  Text(
+                                    _locationPermissionDenied
+                                        ? 'Map shows wrong area. Enable GPS to see drivers near you.'
+                                        : 'Searching for your GPS...',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.orange.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (_locationPermissionDenied)
+                              TextButton(
+                                onPressed: _fetchFreshLocation,
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12),
+                                  minimumSize: Size.zero,
+                                ),
+                                child: Text(
+                                  'Retry',
+                                  style: TextStyle(
+                                    color: Colors.orange.shade900,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                // Recenter-to-me FAB (Uber-style)
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: Material(
+                    color: Colors.white,
+                    elevation: 4,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () {
+                        if (userLocation != null) {
+                          _mapController?.animateCamera(
+                            CameraUpdate.newLatLngZoom(
+                              LatLng(userLocation.lat, userLocation.lng),
+                              15,
+                            ),
+                          );
+                        } else {
+                          // Trigger a fresh GPS fetch
+                          _fetchFreshLocation();
+                        }
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Icon(
+                          Icons.my_location,
+                          color: _navy,
+                          size: 22,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -277,15 +510,17 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton.icon(
-                      onPressed: _trucks.isEmpty
+                      onPressed: (_trucks.isEmpty || !_hasRealLocation)
                           ? null
                           : () => _findNearestDriver(context),
                       icon: const Icon(Icons.local_shipping_rounded,
                           color: Colors.white, size: 22),
                       label: Text(
-                        _trucks.isEmpty
-                            ? 'No drivers available'
-                            : 'Find a Driver',
+                        !_hasRealLocation
+                            ? 'Enable Location to Find Drivers'
+                            : _trucks.isEmpty
+                                ? 'No drivers available'
+                                : 'Find a Driver',
                         style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: 16,
@@ -326,8 +561,7 @@ class _LoadOwnerHomeScreenState extends ConsumerState<LoadOwnerHomeScreen> {
     // Quick feedback then open SendRequest
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-            'Closest driver: ${nearest.name} · ${nearest.distance} away'),
+        content: Text('Closest driver: ${nearest.name}'),
         backgroundColor: _navy,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
@@ -489,7 +723,7 @@ class _DriverDetailsSheet extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(child: _StatCell(label: 'CAPACITY', value: truck.capacity)),
-                      Expanded(child: _StatCell(label: 'DISTANCE', value: truck.distance)),
+                      const Expanded(child: SizedBox()),
                     ],
                   ),
                 ],
@@ -506,7 +740,16 @@ class _DriverDetailsSheet extends StatelessWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {},
+                      onPressed: () async {
+                        final user =
+                            await UserRepository().getUser(truck.userId);
+                        final phone = user?.phone ?? '';
+                        if (phone.isEmpty) return;
+                        final uri = Uri.parse('tel:$phone');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        }
+                      },
                       icon: const Icon(Icons.phone_outlined, size: 18, color: Colors.black87),
                       label: Text(
                         'Call',

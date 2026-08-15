@@ -3,8 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/services/session_service.dart';
 import '../../core/utils/validators.dart';
-import '../../data/models/user_model.dart';
-import '../../data/models/vehicle_model.dart';
 import '../../data/repositories/user_repository.dart';
 import 'location_permission_screen.dart';
 
@@ -61,32 +59,19 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
 
     setState(() => _isSaving = true);
     try {
-      final repo = UserRepository();
-
-      // 1. Save user profile
-      await repo.saveUser(UserModel(
-        id: widget.uid,
+      // ⚛️ ACID: all 3 inserts wrapped in a single atomic transaction.
+      // If any step fails, ALL roll back — no orphan accounts.
+      await UserRepository().signupDriverAtomic(
+        uid: widget.uid,
         phone: widget.phone,
         name: widget.name,
-        userType: 'driver',
-        createdAt: DateTime.now(),
-      ));
-
-      // 2. Save driver details
-      await repo.saveDriverDetails(
-        userId: widget.uid,
         licenseNumber: widget.licenseNumber,
         experience: widget.experience,
-      );
-
-      // 3. Save vehicle
-      await repo.saveVehicle(VehicleModel(
-        id: const Uuid().v4(),
-        userId: widget.uid,
-        vehicleNumber: _vehicleNumberController.text.trim().toUpperCase(),
+        vehicleId: const Uuid().v4(),
+        vehicleNumber:
+            _vehicleNumberController.text.trim().toUpperCase(),
         vehicleType: _selectedType!,
-        createdAt: DateTime.now(),
-      ));
+      );
 
       // 4. Persist login state locally (uid stored for background GPS isolate)
       final prefs = await SharedPreferences.getInstance();

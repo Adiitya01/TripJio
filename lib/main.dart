@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/firebase_options.dart';
 import 'core/config/supabase_config.dart';
@@ -13,6 +15,10 @@ import 'core/services/notification_service.dart';
 import 'core/services/app_lifecycle_service.dart';
 import 'core/widgets/connectivity_banner.dart';
 import 'features/onboarding/splash/splash_screen.dart';
+
+/// Global navigator key — used by NotificationService to route notification
+/// taps into the widget tree from outside of any BuildContext.
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 /// Top-level handler called when an FCM message arrives while
 /// the app is in the background or terminated. Must be a
@@ -36,17 +42,23 @@ void main() async {
     final widgetsBinding = WidgetsBinding.instance;
     FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
-    FlutterError.onError = (FlutterErrorDetails details) {
-      FlutterError.presentError(details);
-      if (kReleaseMode) {
-        // TODO: report to Sentry / Crashlytics
-      }
-    };
-
     // ─── Initialize Firebase ───────────────────────────────
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // Crashlytics: collect only in release, mirror to console in debug.
+    await FirebaseCrashlytics.instance
+        .setCrashlyticsCollectionEnabled(kReleaseMode);
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+    };
+    // Catches errors from the platform/Flutter engine outside the framework.
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
 
     // Register background FCM handler (must be done early, before runApp)
     FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundMessageHandler);
@@ -70,6 +82,17 @@ void main() async {
       },
     );
 
+    // ─── Preload Poppins in parallel with the splash animation ─────────────
+    // Without this, the first-launch onboarding screen renders with the system
+    // fallback (Roboto) and then visibly re-flows to Poppins once Google Fonts
+    // finishes downloading. Fire-and-forget: don't block startup on it.
+    unawaited(GoogleFonts.pendingFonts([
+      GoogleFonts.poppins(fontWeight: FontWeight.w400),
+      GoogleFonts.poppins(fontWeight: FontWeight.w500),
+      GoogleFonts.poppins(fontWeight: FontWeight.w600),
+      GoogleFonts.poppins(fontWeight: FontWeight.w700),
+    ]));
+
     // ─── Initialize notifications (safe — wrapped in try/catch internally) ─
     await NotificationService().initialize();
 
@@ -83,11 +106,10 @@ void main() async {
 
     runApp(const ProviderScope(child: MyApp()));
   }, (error, stack) {
-    // Global async error catcher
     if (kDebugMode) {
-      debugPrint('💥 Uncaught async error: $error\n$stack');
+      debugPrint('Uncaught async error: $error\n$stack');
     }
-    // TODO: report to Sentry / Crashlytics in release
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
   });
 }
 
@@ -98,6 +120,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TripJio',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         scaffoldBackgroundColor: const Color(0xFF003F7D),

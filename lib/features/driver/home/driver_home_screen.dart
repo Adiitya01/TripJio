@@ -7,6 +7,8 @@ import '../providers/driver_provider.dart';
 import 'driver_map_screen.dart';
 import 'incoming_load_screen.dart';
 import '../profile/driver_settings_screen.dart';
+import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/welcome_dialog.dart';
 import '../../../data/repositories/user_repository.dart';
 import '../../../data/repositories/trip_repository.dart';
 import '../../../data/models/trip_model.dart';
@@ -58,6 +60,7 @@ class DriverHomeScreen extends ConsumerStatefulWidget {
 class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  String? _lastShownRequestId;
 
   @override
   void dispose() {
@@ -87,6 +90,9 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen>
 
     // 5.2 — Resume active trip if user closed the app mid-trip
     WidgetsBinding.instance.addPostFrameCallback((_) => _resumeActiveTrip());
+    // First-time welcome (shows once, persisted in SharedPreferences)
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => WelcomeDialog.showOnce(context, isDriver: true));
     // Restore previous "online" state from DB
     Future.microtask(() => ref.read(driverStateRestoreProvider));
 
@@ -101,16 +107,23 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen>
     // Listen for incoming requests and auto-show IncomingLoadScreen
     ref.listenManual(incomingRequestProvider, (_, next) {
       next.whenData((request) async {
+        // Stream re-emits the same request on every event — de-dupe so we
+        // don't stack multiple IncomingLoadScreen instances.
+        if (request.id == _lastShownRequestId) return;
+        _lastShownRequestId = request.id;
         final loadOwnerName = await UserRepository()
             .getUser(request.loadOwnerId)
             .then((u) => u?.name ?? 'Load Owner');
         if (!mounted) return;
-        Navigator.of(context).push(MaterialPageRoute(
+        await Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => IncomingLoadScreen(
             request: request,
             loadOwnerName: loadOwnerName,
           ),
         ));
+        // Reset once the screen closes (accept/reject/expire) so a genuinely
+        // new request from the same driver session can still surface.
+        _lastShownRequestId = null;
       });
     });
   }
@@ -128,7 +141,9 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen>
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.menu, color: Colors.black87),
+          icon: const Icon(Icons.account_circle_outlined,
+              color: Colors.black87, size: 28),
+          tooltip: 'Profile',
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const DriverSettingsScreen()),
@@ -232,14 +247,17 @@ class _OnlineToggleBanner extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isOnline ? Colors.white : Colors.grey,
-            ),
-          ),
+          // Pulsing dot when online (Uber-style)
+          isOnline
+              ? const _PulsingDot()
+              : Container(
+                  width: 12,
+                  height: 12,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey,
+                  ),
+                ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -740,36 +758,6 @@ class _BottomActions extends ConsumerWidget {
   }
 }
 
-class _TappableLoadCard extends StatelessWidget {
-  final String company;
-  final String location;
-  final String vehicleType;
-  final String tripDistance;
-  final bool isNew;
-
-  const _TappableLoadCard({
-    required this.company,
-    required this.location,
-    required this.vehicleType,
-    required this.tripDistance,
-    required this.isNew,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {}, // Real requests come via Supabase Realtime
-      child: _LoadCard(
-        company: company,
-        location: location,
-        vehicleType: vehicleType,
-        tripDistance: tripDistance,
-        isNew: isNew,
-      ),
-    );
-  }
-}
-
 // ─── My Trips Tab ────────────────────────────────────────────────────────────
 
 // Loads real trips from Supabase
@@ -824,9 +812,16 @@ class _MyTripsTab extends ConsumerWidget {
                       : trips;
 
               if (filtered.isEmpty) {
-                return const Center(
-                  child: Text('No trips yet',
-                      style: TextStyle(color: Colors.black45)),
+                return EmptyState(
+                  icon: Icons.local_shipping_outlined,
+                  title: filter == 0
+                      ? 'No trips yet'
+                      : filter == 1
+                          ? 'No completed trips'
+                          : 'No cancelled trips',
+                  message: filter == 0
+                      ? 'Your accepted loads will appear here.\nGo online to start receiving requests!'
+                      : 'Trips with this status will appear here.',
                 );
               }
 
@@ -1012,6 +1007,71 @@ class _TripHistoryCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Pulsing online indicator (Uber/Rapido-style) ──────────────────────────
+class _PulsingDot extends StatefulWidget {
+  const _PulsingDot();
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 18,
+      height: 18,
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (_, __) {
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              // Outer pulse ring
+              Container(
+                width: 18 * (0.5 + _ctrl.value * 0.5),
+                height: 18 * (0.5 + _ctrl.value * 0.5),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white
+                      .withValues(alpha: 1.0 - _ctrl.value),
+                ),
+              ),
+              // Inner solid dot
+              Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

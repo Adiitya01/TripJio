@@ -1,20 +1,63 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../data/repositories/trip_repository.dart';
+import 'trip_completed_screen.dart';
 
-class DriverArrivedScreen extends StatelessWidget {
+class DriverArrivedScreen extends StatefulWidget {
   final dynamic driver;
 
   const DriverArrivedScreen({super.key, required this.driver});
 
+  @override
+  State<DriverArrivedScreen> createState() => _DriverArrivedScreenState();
+}
+
+class _DriverArrivedScreenState extends State<DriverArrivedScreen> {
   static const Color _navy = Color(0xFF003F7D);
   static const Color _navyLight = Color(0xFFE6EEF8);
 
+  Timer? _statusPoll;
+
+  @override
+  void initState() {
+    super.initState();
+    // Poll trip status every 3s — when driver marks complete, navigate
+    _statusPoll = Timer.periodic(const Duration(seconds: 3), (_) => _checkTripStatus());
+  }
+
+  @override
+  void dispose() {
+    _statusPoll?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkTripStatus() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final trip = await TripRepository().getActiveTripForUser(uid);
+      // If no active trip → driver completed it
+      if (trip == null && mounted) {
+        _statusPoll?.cancel();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => TripCompletedScreen(
+              driverName: widget.driver.name as String?,
+            ),
+          ),
+        );
+      }
+    } catch (_) {/* network glitch — try again on next tick */}
+  }
+
   @override
   Widget build(BuildContext context) {
+    final driver = widget.driver;
     final String driverName = driver.name ?? 'Driver';
     final String vehicleInfo = driver.vehicle ?? '';
     final String vehicleNumber = driver.number ?? '';
-
     final String firstName = driverName.split(' ')[0];
 
     return Scaffold(
@@ -77,7 +120,6 @@ class DriverArrivedScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 48),
-                  
                   // Driver Info Card
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -161,7 +203,14 @@ class DriverArrivedScreen extends StatelessWidget {
                       flex: 2,
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.pop(context);
+                          // Waiting for driver to complete — polling will auto-navigate
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Waiting for the driver to mark trip complete...'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _navy,
@@ -171,7 +220,7 @@ class DriverArrivedScreen extends StatelessWidget {
                           elevation: 0,
                         ),
                         child: const Text(
-                          'Complete Trip',
+                          'Awaiting Trip End',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
