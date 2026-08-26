@@ -12,7 +12,7 @@ This Privacy Policy explains how Trip-Jio Logistics (“Trip-Jio”, “we”, �
 We collect the following categories of information:
 
 - **Account information:** name, mobile phone number, role (Driver or Load Owner), city, and company name (Load Owners).
-- **Driver verification information:** driver licence number, years of driving experience, vehicle number, and vehicle type.
+- **Driver verification information:** driver's name, age, licence number, vehicle number, and vehicle type.
 - **Location information:** precise GPS location while the App is running, and at regular intervals while a trip is active, including when the App is running in the background. Background location is required to keep the Load Owner informed of the Driver’s progress.
 - **Trip information:** pickup and drop locations, goods description, weight, trip status, timestamps, and the route travelled.
 - **Device information:** device model, OS version, app version, and unique installation identifiers, used for analytics and crash reporting.
@@ -24,6 +24,7 @@ We use your information to:
 
 - Operate the platform (match Load Owners with Drivers, dispatch trips, calculate fares).
 - Provide real-time trip tracking and ETAs.
+- Provide status updates to customers about their booking (pickup confirmed, driver en route, driver arrived, and delivered).
 - Verify Driver identity and vehicle documents.
 - Send transactional notifications (trip accepted, driver arrived, trip completed).
 - Improve the App’s reliability via aggregated, de-identified analytics.

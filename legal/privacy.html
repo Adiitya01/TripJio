@@ -6,7 +6,7 @@
 <title>Privacy Policy — TripJio</title>
 <meta name="description" content="TripJio Privacy Policy — how we collect, use, and protect your data.">
 <style>
-:root { --navy:#003F7D; --navy-dark:#002F5F; --green:#22A94F; --green-dark:#0F5F26; --text:#1a1f2e; --muted:#5a6473; --border:#e5e9ef; --bg:#fafbfc; }
+:root { --navy:#003F7D; --navy-dark:#002F5F; --maroon:#800000; --maroon-dark:#5C0000; --text:#1a1f2e; --muted:#5a6473; --border:#e5e9ef; --bg:#fafbfc; }
 * { box-sizing:border-box; margin:0; padding:0; }
 html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
 body { font-family:'Inter','Segoe UI',-apple-system,BlinkMacSystemFont,Arial,sans-serif; color:var(--text); background:var(--bg); line-height:1.7; font-size:16px; -webkit-font-smoothing:antialiased; }
@@ -18,7 +18,7 @@ a:hover { border-bottom-color:var(--navy); }
 .brand { display:flex; align-items:center; gap:12px; color:#fff; border-bottom:none; }
 .brand svg { width:44px; height:44px; }
 .brand-name { font-size:22px; font-weight:800; letter-spacing:-.3px; }
-.brand-name .accent { color:var(--green); }
+.brand-name .accent { color:var(--maroon); }
 .nav { display:flex; gap:24px; align-items:center; }
 .nav a { color:#fff; opacity:.85; font-weight:500; font-size:15px; border-bottom:none; }
 .nav a:hover { opacity:1; }
@@ -31,7 +31,7 @@ h2 { font-size:22px; font-weight:700; color:var(--navy); margin:40px 0 14px; let
 p { margin-bottom:14px; }
 ul, ol { margin:12px 0 18px 24px; }
 li { margin-bottom:6px; }
-li::marker { color:var(--green); }
+li::marker { color:var(--maroon); }
 strong { color:var(--text); font-weight:700; }
 .callout { background:#f0f7ff; border-left:4px solid var(--navy); padding:16px 20px; border-radius:6px; margin:24px 0; font-size:15px; }
 .footer { background:#fff; border-top:1px solid var(--border); padding:32px 0; text-align:center; color:var(--muted); font-size:14px; }
@@ -46,17 +46,17 @@ strong { color:var(--text); font-weight:700; }
   <div class="container">
     <a href="index.html" class="brand">
       <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-        <path d="M 8 42 Q 8 18 30 18 L 62 18 Q 74 18 74 42 L 74 62 L 8 62 Z" fill="#22A94F"/>
-        <rect x="8" y="42" width="66" height="5" fill="#0F5F26"/>
-        <rect x="16" y="50" width="4" height="18" fill="#0F5F26"/>
-        <rect x="30" y="50" width="4" height="18" fill="#0F5F26"/>
-        <rect x="44" y="50" width="4" height="18" fill="#0F5F26"/>
-        <rect x="58" y="50" width="4" height="18" fill="#0F5F26"/>
-        <path d="M 74 42 L 84 42 L 92 58 L 92 68 L 74 68 Z" fill="#0F5F26"/>
+        <path d="M 8 42 Q 8 18 30 18 L 62 18 Q 74 18 74 42 L 74 62 L 8 62 Z" fill="#800000"/>
+        <rect x="8" y="42" width="66" height="5" fill="#5C0000"/>
+        <rect x="16" y="50" width="4" height="18" fill="#5C0000"/>
+        <rect x="30" y="50" width="4" height="18" fill="#5C0000"/>
+        <rect x="44" y="50" width="4" height="18" fill="#5C0000"/>
+        <rect x="58" y="50" width="4" height="18" fill="#5C0000"/>
+        <path d="M 74 42 L 84 42 L 92 58 L 92 68 L 74 68 Z" fill="#5C0000"/>
         <circle cx="26" cy="76" r="9" fill="#0E1F14"/>
-        <circle cx="26" cy="76" r="3.5" fill="#22A94F"/>
+        <circle cx="26" cy="76" r="3.5" fill="#800000"/>
         <circle cx="80" cy="76" r="9" fill="#0E1F14"/>
-        <circle cx="80" cy="76" r="3.5" fill="#22A94F"/>
+        <circle cx="80" cy="76" r="3.5" fill="#800000"/>
       </svg>
       <span class="brand-name">Trip<span class="accent">Jio</span></span>
     </a>
@@ -79,7 +79,7 @@ strong { color:var(--text); font-weight:700; }
     <p>We collect the following categories of information:</p>
     <ul>
       <li><strong>Account information:</strong> name, mobile phone number, role (Driver or Load Owner), city, and company name (Load Owners).</li>
-      <li><strong>Driver verification information:</strong> driver licence number, years of driving experience, vehicle number, and vehicle type.</li>
+      <li><strong>Driver verification information:</strong> driver's name, age, licence number, vehicle number, and vehicle type.</li>
       <li><strong>Location information:</strong> precise GPS location while the App is running, and at regular intervals while a trip is active, including when the App is running in the background. Background location is required to keep the Load Owner informed of the Driver's progress.</li>
       <li><strong>Trip information:</strong> pickup and drop locations, goods description, weight, trip status, timestamps, and the route travelled.</li>
       <li><strong>Device information:</strong> device model, OS version, app version, and unique installation identifiers, used for analytics and crash reporting.</li>
@@ -91,6 +91,7 @@ strong { color:var(--text); font-weight:700; }
     <ul>
       <li>Operate the platform (match Load Owners with Drivers, dispatch trips, calculate fares).</li>
       <li>Provide real-time trip tracking and ETAs.</li>
+      <li>Provide status updates to customers about their booking (pickup confirmed, driver en route, driver arrived, and delivered).</li>
       <li>Verify Driver identity and vehicle documents.</li>
       <li>Send transactional notifications (trip accepted, driver arrived, trip completed).</li>
       <li>Improve the App's reliability via aggregated, de-identified analytics.</li>

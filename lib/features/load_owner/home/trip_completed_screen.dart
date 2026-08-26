@@ -79,32 +79,6 @@ class TripCompletedScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 32),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _navyLight,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.account_balance_wallet_outlined,
-                      color: _navy, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Please pay the driver directly via UPI.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: _navy,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
             const Spacer(flex: 3),
             // Back to home button
             Padding(
