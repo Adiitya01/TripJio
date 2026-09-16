@@ -262,7 +262,7 @@ In compliance with the Information Technology Act, 2000 and applicable rules:
 - Name: Ashish Pramod Sharangdhar
 - Designation: Grievance Officer, Trip-Jio
 - Phone: +91 7506181055
-- Email: tripjio@gmail.com
+- Email: tripjio.app@gmail.com
 - Address: APS Consulting Solutions, Mumbai, Maharashtra, India
 - Response Time: Within 48 hours of complaint
 
@@ -304,6 +304,6 @@ The following clarifications apply in addition to and reinforce the terms set ou
 
 For any queries about these Terms:
 
-- Email: tripjio@gmail.com
+- Email: tripjio.app@gmail.com
 - Website: https://www.apsconsulting.solutions
 - Address: APS Consulting Solutions, Mumbai, Maharashtra, India

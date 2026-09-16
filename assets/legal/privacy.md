@@ -61,7 +61,7 @@ You have the right to:
 
 ## 8. Security
 
-We protect your data with industry-standard practices: encrypted connections (TLS), restricted database access (row-level security), and least-privilege backend roles. No system is perfectly secure; if you suspect a breach, contact us immediately at tripjio@gmail.com.
+We protect your data with industry-standard practices: encrypted connections (TLS), restricted database access (row-level security), and least-privilege backend roles. No system is perfectly secure; if you suspect a breach, contact us immediately at tripjio.app@gmail.com.
 
 ## 9. Children
 
@@ -75,7 +75,7 @@ We may update this Privacy Policy from time to time. Material changes will be an
 
 For privacy questions or requests:
 
-- Email: tripjio@gmail.com
+- Email: tripjio.app@gmail.com
 - Website: https://www.apsconsulting.solutions
 - Postal: APS Consulting Solutions, Mumbai, Maharashtra, India
 
