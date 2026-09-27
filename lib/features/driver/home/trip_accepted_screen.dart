@@ -175,7 +175,7 @@ class _TripAcceptedScreenState extends ConsumerState<TripAcceptedScreen> {
                                         fontSize: 16,
                                         color: Colors.black87)),
                                 const SizedBox(height: 3),
-                                const Text('Load Owner',
+                                const Text('Customer',
                                     style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.black54)),

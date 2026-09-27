@@ -68,7 +68,7 @@ class TripDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _Section(
-            title: viewerIsDriver ? 'Load owner' : 'Driver',
+            title: viewerIsDriver ? 'Customer' : 'Driver',
             child: Row(
               children: [
                 Container(

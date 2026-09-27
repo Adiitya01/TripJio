@@ -135,7 +135,7 @@ class _TripInProgressScreenState
       context,
       title: 'Confirm pickup?',
       message:
-          "Confirm that you've reached the pickup location and loaded the goods. The load owner will be notified.",
+          "Confirm that you've reached the pickup location and loaded the goods. The customer will be notified.",
       confirmText: 'Confirm Pickup',
     );
     if (confirmed != true || !mounted) return;
@@ -175,7 +175,7 @@ class _TripInProgressScreenState
       context,
       title: 'Mark trip as complete?',
       message:
-          "Confirm that you've reached the drop location and delivered the goods. The load owner will be notified.",
+          "Confirm that you've reached the drop location and delivered the goods. The customer will be notified.",
       confirmText: 'Complete Trip',
     );
     if (confirmed != true || !mounted) return;
@@ -316,7 +316,7 @@ class _TripInProgressScreenState
     _exitedOnCancellation = true;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('The load owner cancelled this trip.'),
+        content: Text('The customer cancelled this trip.'),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
       ),

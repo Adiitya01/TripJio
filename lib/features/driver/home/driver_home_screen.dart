@@ -113,7 +113,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen>
         _lastShownRequestId = request.id;
         final loadOwnerName = await UserRepository()
             .getUser(request.loadOwnerId)
-            .then((u) => u?.name ?? 'Load Owner');
+            .then((u) => u?.name ?? 'Customer');
         if (!mounted) return;
         await Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => IncomingLoadScreen(
@@ -456,7 +456,7 @@ class _NearbyLoadsSection extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                "We'll notify you when a load owner sends a request",
+                "We'll notify you when a customer sends a request",
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   fontSize: 12,

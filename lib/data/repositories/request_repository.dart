@@ -57,7 +57,7 @@ class RequestRepository {
 
         // Fire local notification to driver
         await NotificationService().notifyNewLoadRequest(
-          loadOwnerName: 'Load Owner',
+          loadOwnerName: 'Customer',
           pickup: request.pickupAddress,
           drop: request.dropAddress,
         );

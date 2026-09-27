@@ -223,7 +223,7 @@ class AccountSettingsScreen extends ConsumerWidget {
                             child: Text(
                               user?.userType == 'driver'
                                   ? 'Driver'
-                                  : 'Load Owner',
+                                  : 'Customer',
                               style: const TextStyle(
                                   fontSize: 11,
                                   color: _navy,
@@ -330,7 +330,7 @@ class AccountSettingsScreen extends ConsumerWidget {
                   children: const [
                     SizedBox(height: 12),
                     Text(
-                      'Connecting load owners with truck drivers across India.',
+                      'Connecting customers with truck drivers across India.',
                       style: TextStyle(fontSize: 13),
                     ),
                   ],
