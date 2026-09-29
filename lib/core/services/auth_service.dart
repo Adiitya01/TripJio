@@ -32,11 +32,13 @@ class AuthService {
         forceResendingToken: resendToken,
         timeout: const Duration(seconds: 60),
 
-        // Android only: auto-verify when OTP is detected from SMS
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          debugPrint('Auto-verification completed');
-          await _auth.signInWithCredential(credential);
-        },
+        // Auto-verify intentionally disabled. Signing in here silently
+        // races with the OTP screen's manual verify: the credential gets
+        // consumed by this call, then the user's tap on Verify hits the
+        // now-invalid verificationId and Firebase returns session-expired.
+        // Forcing manual entry keeps profile lookup + session registration
+        // in the OTP screen's post-verify flow where they belong.
+        verificationCompleted: (PhoneAuthCredential credential) {},
 
         verificationFailed: (FirebaseAuthException e) {
           debugPrint('Verification failed: ${e.code} — ${e.message}');

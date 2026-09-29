@@ -2,7 +2,7 @@ name: tripjio
 description: A new Flutter project for TripJio.
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.1+2
 # Format: <version-name>+<version-code>
 # Increment version-code for every Play Store upload (1, 2, 3, ...)
 
